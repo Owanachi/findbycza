@@ -11,8 +11,7 @@ const columns = [
   { key: 'qty', label: 'Quantity', sortable: true },
   { key: 'remarks', label: 'Remarks', sortable: false },
   { key: 'status', label: 'Status', sortable: false },
-  { key: 'updated_by', label: 'Updated By', sortable: true },
-  { key: 'updated_at', label: 'Updated At', sortable: true },
+  { key: 'updated_at', label: 'Last Updated', sortable: true },
 ]
 
 function formatDate(dateStr) {
@@ -186,18 +185,16 @@ export default function ProductTable({ products, loading, onEdit, onDelete, sort
                 </td>
                 <td className="px-4 py-3">
                   {p.updated_by ? (
-                    <span className="relative group">
-                      <span className="text-xs text-gray-600 cursor-default">{p.updated_by}</span>
+                    <div className="relative group cursor-default">
+                      <div className="text-xs text-gray-900">{p.updated_by}</div>
+                      <div className="text-[11px] text-gray-400">{formatDate(p.updated_at)}</div>
                       <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                         {formatFullDate(p.updated_at)}
                       </span>
-                    </span>
+                    </div>
                   ) : (
                     <span className="text-xs text-gray-400">—</span>
                   )}
-                </td>
-                <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
-                  {formatDate(p.updated_at)}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1">
