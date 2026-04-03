@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Toaster, toast } from 'react-hot-toast'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Search, X } from 'lucide-react'
 import { supabase } from './lib/supabase'
 import { AuthProvider, useAuth } from './lib/AuthContext'
 import Dashboard from './components/Dashboard'
@@ -15,10 +15,42 @@ function Inventory() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('All')
+  const [subCategory, setSubCategory] = useState('All')
+  const [status, setStatus] = useState('All')
+  const [minPrice, setMinPrice] = useState('')
+  const [maxPrice, setMaxPrice] = useState('')
   const [sortField, setSortField] = useState('created_at')
   const [sortDir, setSortDir] = useState('desc')
   const [modalOpen, setModalOpen] = useState(false)
   const [editProduct, setEditProduct] = useState(null)
+  const [allCategories, setAllCategories] = useState([])
+  const [allSubCategories, setAllSubCategories] = useState({})
+
+  // Fetch all distinct categories and sub-categories once on mount
+  useEffect(() => {
+    async function fetchFilterOptions() {
+      const { data } = await supabase
+        .from('products')
+        .select('category, sub_category')
+      if (data) {
+        const cats = [...new Set(data.map((p) => p.category).filter(Boolean))].sort()
+        setAllCategories(cats)
+        const subCatMap = {}
+        for (const p of data) {
+          if (p.category && p.sub_category) {
+            if (!subCatMap[p.category]) subCatMap[p.category] = new Set()
+            subCatMap[p.category].add(p.sub_category)
+          }
+        }
+        const sorted = {}
+        for (const [cat, subs] of Object.entries(subCatMap)) {
+          sorted[cat] = [...subs].sort()
+        }
+        setAllSubCategories(sorted)
+      }
+    }
+    fetchFilterOptions()
+  }, [products])
 
   const fetchProducts = useCallback(async () => {
     setLoading(true)
@@ -30,6 +62,18 @@ function Inventory() {
     if (category && category !== 'All') {
       query = query.eq('category', category)
     }
+    if (subCategory && subCategory !== 'All') {
+      query = query.eq('sub_category', subCategory)
+    }
+    if (minPrice !== '') {
+      query = query.gte('price', Number(minPrice))
+    }
+    if (maxPrice !== '') {
+      query = query.lte('price', Number(maxPrice))
+    }
+    if (status === 'Out of Stock') {
+      query = query.eq('qty', 0)
+    }
     query = query.order(sortField, { ascending: sortDir === 'asc' })
 
     const { data, error } = await query
@@ -37,16 +81,43 @@ function Inventory() {
       toast.error('Failed to load products')
       console.error(error)
     } else {
-      setProducts(data || [])
+      let filtered = data || []
+      // Client-side status filtering for Low Stock / In Stock (depends on low_stock threshold)
+      if (status === 'Low Stock') {
+        filtered = filtered.filter((p) => p.qty > 0 && p.qty <= p.low_stock)
+      } else if (status === 'In Stock') {
+        filtered = filtered.filter((p) => p.qty > p.low_stock)
+      }
+      setProducts(filtered)
     }
     setLoading(false)
-  }, [search, category, sortField, sortDir])
+  }, [search, category, subCategory, status, minPrice, maxPrice, sortField, sortDir])
 
   useEffect(() => {
     fetchProducts()
   }, [fetchProducts])
 
-  const categories = ['All', ...new Set(products.map((p) => p.category).filter(Boolean))]
+  const hasActiveFilters = search || category !== 'All' || subCategory !== 'All' || status !== 'All' || minPrice !== '' || maxPrice !== ''
+
+  const clearFilters = () => {
+    setSearch('')
+    setCategory('All')
+    setSubCategory('All')
+    setStatus('All')
+    setMinPrice('')
+    setMaxPrice('')
+  }
+
+  // Get sub-categories for the currently selected category
+  const subCategories = category !== 'All' && allSubCategories[category]
+    ? ['All', ...allSubCategories[category]]
+    : ['All']
+
+  // Reset sub-category when category changes
+  const handleCategoryChange = (value) => {
+    setCategory(value)
+    setSubCategory('All')
+  }
 
   const handleAdd = () => {
     setEditProduct(null)
@@ -115,24 +186,90 @@ function Inventory() {
         )}
 
         <div className="mt-8 bg-white rounded-xl shadow-sm border border-gray-200">
-          <div className="p-4 sm:p-6 border-b border-gray-200">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <input
-                type="text"
-                placeholder="Search by name or category..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-              />
+          <div className="p-4 sm:p-6 border-b border-gray-200 space-y-3">
+            {/* Row 1: Search + Category + Sub-Category */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by name or category..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm"
+                />
+              </div>
               <select
                 value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white"
+                onChange={(e) => handleCategoryChange(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white text-sm min-w-[160px]"
               >
-                {categories.map((c) => (
+                <option value="All">All Categories</option>
+                {allCategories.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
               </select>
+              <select
+                value={subCategory}
+                onChange={(e) => setSubCategory(e.target.value)}
+                disabled={category === 'All'}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white text-sm min-w-[160px] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="All">All Sub-Categories</option>
+                {subCategories.filter((s) => s !== 'All').map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Row 2: Status + Price Range + Clear */}
+            <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white text-sm min-w-[140px]"
+              >
+                <option value="All">All Status</option>
+                <option value="In Stock">In Stock</option>
+                <option value="Low Stock">Low Stock</option>
+                <option value="Out of Stock">Out of Stock</option>
+              </select>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500 whitespace-nowrap">Price:</span>
+                <input
+                  type="number"
+                  placeholder="Min"
+                  value={minPrice}
+                  onChange={(e) => setMinPrice(e.target.value)}
+                  min="0"
+                  className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm"
+                />
+                <span className="text-gray-400">—</span>
+                <input
+                  type="number"
+                  placeholder="Max"
+                  value={maxPrice}
+                  onChange={(e) => setMaxPrice(e.target.value)}
+                  min="0"
+                  className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm"
+                />
+              </div>
+              {hasActiveFilters && (
+                <button
+                  onClick={clearFilters}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 border border-gray-300 rounded-lg transition-colors"
+                >
+                  <X size={14} />
+                  Clear Filters
+                </button>
+              )}
+            </div>
+
+            {/* Result count */}
+            <div className="text-xs text-gray-500">
+              <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full font-medium">
+                {products.length} {products.length === 1 ? 'result' : 'results'}
+              </span>
             </div>
           </div>
 
