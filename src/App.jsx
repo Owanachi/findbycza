@@ -11,6 +11,7 @@ import LowStockAlert from './components/LowStockAlert'
 import Login from './components/Login'
 
 function Inventory() {
+  const { user } = useAuth()
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -141,10 +142,11 @@ function Inventory() {
   }
 
   const handleSave = async (product) => {
+    const productWithUser = { ...product, updated_by: user?.email || null }
     if (editProduct) {
       const { error } = await supabase
         .from('products')
-        .update(product)
+        .update(productWithUser)
         .eq('id', editProduct.id)
       if (error) {
         toast.error('Update failed')
@@ -152,7 +154,7 @@ function Inventory() {
       }
       toast.success('Product updated')
     } else {
-      const { error } = await supabase.from('products').insert([product])
+      const { error } = await supabase.from('products').insert([productWithUser])
       if (error) {
         toast.error('Insert failed')
         return

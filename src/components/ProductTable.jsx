@@ -11,7 +11,23 @@ const columns = [
   { key: 'qty', label: 'Quantity', sortable: true },
   { key: 'remarks', label: 'Remarks', sortable: false },
   { key: 'status', label: 'Status', sortable: false },
+  { key: 'updated_by', label: 'Updated By', sortable: true },
+  { key: 'updated_at', label: 'Updated At', sortable: true },
 ]
+
+function formatDate(dateStr) {
+  if (!dateStr) return '—'
+  const d = new Date(dateStr)
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+}
+
+function formatFullDate(dateStr) {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+    + ' at ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })
+}
 
 function isHttpUrl(str) {
   return typeof str === 'string' && str.startsWith('http')
@@ -167,6 +183,21 @@ export default function ProductTable({ products, loading, onEdit, onDelete, sort
                     <span className={`w-1.5 h-1.5 rounded-full ${isLow ? 'bg-red-500' : 'bg-green-500'}`} />
                     {isLow ? 'Low Stock' : 'In Stock'}
                   </span>
+                </td>
+                <td className="px-4 py-3">
+                  {p.updated_by ? (
+                    <span className="relative group">
+                      <span className="text-xs text-gray-600 cursor-default">{p.updated_by}</span>
+                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                        {formatFullDate(p.updated_at)}
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="text-xs text-gray-400">—</span>
+                  )}
+                </td>
+                <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+                  {formatDate(p.updated_at)}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1">
