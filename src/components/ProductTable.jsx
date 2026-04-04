@@ -32,9 +32,9 @@ function isHttpUrl(str) {
 function SortIcon({ field, sortField, sortDir }) {
   if (field !== sortField) return <ChevronUp size={14} className="text-gray-300" />
   return sortDir === 'asc' ? (
-    <ChevronUp size={14} className="text-indigo-600" />
+    <ChevronUp size={14} className="text-purple-600" />
   ) : (
-    <ChevronDown size={14} className="text-indigo-600" />
+    <ChevronDown size={14} className="text-purple-600" />
   )
 }
 
@@ -180,7 +180,7 @@ function DetailModal({ product, onClose, onEdit, onDelete }) {
         <div className="sticky bottom-0 bg-white border-t border-gray-100 px-6 py-4 flex gap-3">
           <button
             onClick={() => { onClose(); onEdit(p) }}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700 transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 text-white text-sm font-medium rounded-xl hover:bg-purple-700 transition-colors"
           >
             <Pencil size={16} />
             Edit Product
@@ -214,7 +214,7 @@ export default function ProductTable({ products, loading, onEdit, onDelete, sort
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 size={32} className="animate-spin text-indigo-500" />
+        <Loader2 size={32} className="animate-spin text-purple-500" />
       </div>
     )
   }
@@ -264,7 +264,7 @@ export default function ProductTable({ products, loading, onEdit, onDelete, sort
             return (
               <tr
                 key={p.id}
-                className={`border-b border-gray-100 hover:bg-indigo-50/40 transition-colors cursor-pointer ${
+                className={`border-b border-gray-100 hover:bg-purple-50/40 transition-colors cursor-pointer ${
                   i % 2 === 1 ? 'bg-gray-50/50' : 'bg-white'
                 }`}
                 onClick={() => setDetailProduct(p)}
@@ -304,14 +304,14 @@ export default function ProductTable({ products, loading, onEdit, onDelete, sort
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => setDetailProduct(p)}
-                      className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                      className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
                       title="View Details"
                     >
                       <Eye size={16} />
                     </button>
                     <button
                       onClick={() => onEdit(p)}
-                      className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                      className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
                       title="Edit"
                     >
                       <Pencil size={16} />

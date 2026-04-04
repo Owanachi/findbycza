@@ -1,6 +1,8 @@
 import { useState } from 'react'
-import { Package, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
+
+const LOGO_URL = 'https://iixivpuyrxeoapsouszx.supabase.co/storage/v1/object/public/product-images/Logo.jpg'
 
 export default function Login() {
   const { signIn } = useAuth()
@@ -25,9 +27,11 @@ export default function Login() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center bg-indigo-600 text-white p-3 rounded-xl mb-4">
-            <Package size={32} />
-          </div>
+          <img
+            src={LOGO_URL}
+            alt="Fabulous Finds by Cza"
+            className="w-20 h-20 rounded-full object-cover mx-auto mb-4 ring-4 ring-purple-100 shadow-lg"
+          />
           <h1 className="text-2xl font-bold text-gray-900">Fabulous Finds by Cza</h1>
           <p className="text-gray-500 mt-1">Sign in to manage your inventory</p>
         </div>
@@ -47,7 +51,7 @@ export default function Login() {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoFocus
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none"
               placeholder="you@example.com"
             />
           </div>
@@ -59,7 +63,7 @@ export default function Login() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none"
               placeholder="Enter your password"
             />
           </div>
@@ -67,7 +71,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white py-2.5 rounded-lg hover:bg-indigo-700 transition-colors font-medium text-sm disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-2 bg-purple-600 text-white py-2.5 rounded-lg hover:bg-purple-700 transition-colors font-medium text-sm disabled:opacity-50"
           >
             {loading ? <Loader2 size={18} className="animate-spin" /> : null}
             {loading ? 'Signing in...' : 'Sign In'}
