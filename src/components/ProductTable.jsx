@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { Pencil, Trash2, ChevronUp, ChevronDown, Loader2, X } from 'lucide-react'
 
 const columns = [
-  { key: 'img', label: '', sortable: false },
   { key: 'name', label: 'Product', sortable: true },
   { key: 'category', label: 'Category', sortable: true },
   { key: 'sub_category', label: 'Sub-Category', sortable: true },
@@ -148,17 +147,19 @@ export default function ProductTable({ products, loading, onEdit, onDelete, sort
             return (
               <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3">
-                  <ProductImage
-                    img={p.img}
-                    name={p.name}
-                    onClick={() => {
-                      if (isHttpUrl(p.img)) {
-                        setLightbox({ src: p.img, alt: p.name })
-                      }
-                    }}
-                  />
+                  <div className="flex items-center gap-3">
+                    <ProductImage
+                      img={p.img}
+                      name={p.name}
+                      onClick={() => {
+                        if (isHttpUrl(p.img)) {
+                          setLightbox({ src: p.img, alt: p.name })
+                        }
+                      }}
+                    />
+                    <span className="font-medium text-gray-900">{p.name}</span>
+                  </div>
                 </td>
-                <td className="px-4 py-3 font-medium text-gray-900">{p.name}</td>
                 <td className="px-4 py-3">
                   <span className="inline-block bg-gray-100 text-gray-700 text-xs px-2.5 py-1 rounded-full">
                     {p.category}
