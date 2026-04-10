@@ -24,19 +24,25 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+    <div
+      className="min-h-screen flex items-center justify-center px-4"
+      style={{ background: 'linear-gradient(135deg, #7C3AED, #9F67F7)' }}
+    >
       <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <img
-            src={LOGO_URL}
-            alt="Fabulous Finds by Cza"
-            className="w-20 h-20 rounded-full object-cover mx-auto mb-4 ring-4 ring-purple-100 shadow-lg"
-          />
-          <h1 className="text-2xl font-bold text-gray-900">Fabulous Finds by Cza</h1>
-          <p className="text-gray-500 mt-1">Sign in to manage your inventory</p>
-        </div>
+        <form
+          onSubmit={handleSubmit}
+          className="bg-white rounded-2xl shadow-2xl border border-[#EDE9FE] p-8 space-y-5"
+        >
+          <div className="text-center">
+            <img
+              src={LOGO_URL}
+              alt="Fabulous Finds by Cza"
+              className="w-24 h-24 rounded-full object-cover mx-auto mb-4 ring-4 ring-[#EDE9FE] shadow-lg"
+            />
+            <h1 className="text-2xl font-bold text-[#7C3AED]">Fabulous Finds by Cza</h1>
+            <p className="text-gray-500 mt-1 text-sm">Sign in to manage your inventory</p>
+          </div>
 
-        <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-4">
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
               {error}
@@ -51,7 +57,7 @@ export default function Login() {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoFocus
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7C3AED] focus:border-[#7C3AED] outline-none"
               placeholder="you@example.com"
             />
           </div>
@@ -63,7 +69,7 @@ export default function Login() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7C3AED] focus:border-[#7C3AED] outline-none"
               placeholder="Enter your password"
             />
           </div>
@@ -71,7 +77,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex items-center justify-center gap-2 bg-purple-600 text-white py-2.5 rounded-lg hover:bg-purple-700 transition-colors font-medium text-sm disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-2 bg-[#7C3AED] text-white py-2.5 rounded-lg hover:bg-[#6D28D9] transition-colors font-semibold text-sm disabled:opacity-50 shadow-md"
           >
             {loading ? <Loader2 size={18} className="animate-spin" /> : null}
             {loading ? 'Signing in...' : 'Sign In'}

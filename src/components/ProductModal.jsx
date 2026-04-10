@@ -84,11 +84,14 @@ export default function ProductModal({ product, onSave, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 overflow-hidden max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-bold text-gray-900">
+        <div
+          className="flex items-center justify-between px-6 py-4"
+          style={{ background: 'linear-gradient(135deg, #7C3AED, #9F67F7)' }}
+        >
+          <h2 className="text-lg font-bold text-white">
             {product ? 'Edit Product' : 'Add Product'}
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+          <button onClick={onClose} className="text-white/80 hover:text-white transition-colors">
             <X size={20} />
           </button>
         </div>
@@ -108,7 +111,7 @@ export default function ProductModal({ product, onSave, onClose }) {
                 )}
                 {uploading && (
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <Loader2 size={24} className="animate-spin text-indigo-600" />
+                    <Loader2 size={24} className="animate-spin text-[#7C3AED]" />
                   </div>
                 )}
               </div>
@@ -142,7 +145,7 @@ export default function ProductModal({ product, onSave, onClose }) {
                 value={form.name}
                 onChange={handleChange}
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7C3AED] focus:border-[#7C3AED] outline-none"
               />
             </div>
             <div>
@@ -152,7 +155,7 @@ export default function ProductModal({ product, onSave, onClose }) {
                 value={form.category}
                 onChange={handleChange}
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7C3AED] focus:border-[#7C3AED] outline-none"
               />
             </div>
             <div>
@@ -161,7 +164,7 @@ export default function ProductModal({ product, onSave, onClose }) {
                 name="sub_category"
                 value={form.sub_category}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7C3AED] focus:border-[#7C3AED] outline-none"
               />
             </div>
             <div>
@@ -174,7 +177,7 @@ export default function ProductModal({ product, onSave, onClose }) {
                 value={form.rs_price}
                 onChange={handleChange}
                 placeholder="Optional"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7C3AED] focus:border-[#7C3AED] outline-none"
               />
             </div>
             <div>
@@ -187,7 +190,7 @@ export default function ProductModal({ product, onSave, onClose }) {
                 value={form.price}
                 onChange={handleChange}
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7C3AED] focus:border-[#7C3AED] outline-none"
               />
             </div>
             <div>
@@ -199,7 +202,7 @@ export default function ProductModal({ product, onSave, onClose }) {
                 value={form.qty}
                 onChange={handleChange}
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7C3AED] focus:border-[#7C3AED] outline-none"
               />
             </div>
             <div>
@@ -211,7 +214,7 @@ export default function ProductModal({ product, onSave, onClose }) {
                 value={form.low_stock}
                 onChange={handleChange}
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7C3AED] focus:border-[#7C3AED] outline-none"
               />
             </div>
             <div>
@@ -221,7 +224,7 @@ export default function ProductModal({ product, onSave, onClose }) {
                 value={form.remarks}
                 onChange={handleChange}
                 placeholder="e.g. Super Sale ₱4,999"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7C3AED] focus:border-[#7C3AED] outline-none"
               />
             </div>
           </div>
@@ -237,7 +240,7 @@ export default function ProductModal({ product, onSave, onClose }) {
             <button
               type="submit"
               disabled={saving}
-              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
+              className="px-4 py-2 text-sm font-medium text-white bg-[#7C3AED] rounded-lg hover:bg-[#6D28D9] transition-colors disabled:opacity-50"
             >
               {saving ? 'Saving...' : product ? 'Update' : 'Add Product'}
             </button>

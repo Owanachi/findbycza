@@ -11,25 +11,21 @@ export default function Dashboard({ products }) {
       label: 'Total Products',
       value: totalProducts,
       icon: Package,
-      color: 'bg-blue-50 text-blue-600',
     },
     {
       label: 'Inventory Value',
       value: `₱${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       iconText: '₱',
-      color: 'bg-green-50 text-green-600',
     },
     {
       label: 'Low Stock Items',
       value: lowStock,
       icon: AlertTriangle,
-      color: 'bg-amber-50 text-amber-600',
     },
     {
       label: 'Categories',
       value: categories,
       icon: Layers,
-      color: 'bg-purple-50 text-purple-600',
     },
   ]
 
@@ -38,10 +34,11 @@ export default function Dashboard({ products }) {
       {stats.map((s) => (
         <div
           key={s.label}
-          className="bg-white rounded-xl p-5 shadow-sm border border-gray-200"
+          className="relative bg-white rounded-xl p-5 shadow-sm border border-[#EDE9FE] overflow-hidden"
         >
+          <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#7C3AED]" />
           <div className="flex items-center gap-4">
-            <div className={`p-3 rounded-lg ${s.color}`}>
+            <div className="p-3 rounded-lg bg-[#EDE9FE] text-[#7C3AED]">
               {s.iconText ? (
                 <span className="text-2xl font-bold leading-none">{s.iconText}</span>
               ) : (
@@ -50,7 +47,7 @@ export default function Dashboard({ products }) {
             </div>
             <div>
               <p className="text-sm text-gray-500">{s.label}</p>
-              <p className="text-2xl font-bold text-gray-900">{s.value}</p>
+              <p className="text-2xl font-bold text-[#7C3AED]">{s.value}</p>
             </div>
           </div>
         </div>

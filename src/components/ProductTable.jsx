@@ -67,7 +67,8 @@ function ProductImage({ img, name, size = 'sm' }) {
 
 function DetailModal({ product, onClose, onEdit, onDelete }) {
   const p = product
-  const isLow = p.qty <= p.low_stock
+  const isOut = p.qty === 0
+  const isLow = !isOut && p.qty <= p.low_stock
 
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Escape') onClose()
@@ -144,11 +145,11 @@ function DetailModal({ product, onClose, onEdit, onDelete }) {
               <div className="mt-1">
                 <span
                   className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${
-                    isLow ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'
+                    isOut ? 'bg-gray-100 text-gray-600' : isLow ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'
                   }`}
                 >
-                  <span className={`w-1.5 h-1.5 rounded-full ${isLow ? 'bg-red-500' : 'bg-green-500'}`} />
-                  {isLow ? 'Low Stock' : 'In Stock'}
+                  <span className={`w-1.5 h-1.5 rounded-full ${isOut ? 'bg-gray-400' : isLow ? 'bg-red-500' : 'bg-green-500'}`} />
+                  {isOut ? 'Out of Stock' : isLow ? 'Low Stock' : 'In Stock'}
                 </span>
               </div>
             </div>
@@ -180,7 +181,7 @@ function DetailModal({ product, onClose, onEdit, onDelete }) {
         <div className="sticky bottom-0 bg-white border-t border-gray-100 px-6 py-4 flex gap-3">
           <button
             onClick={() => { onClose(); onEdit(p) }}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 text-white text-sm font-medium rounded-xl hover:bg-purple-700 transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-[#7C3AED] text-white text-sm font-medium rounded-xl hover:bg-[#6D28D9] transition-colors"
           >
             <Pencil size={16} />
             Edit Product
@@ -208,13 +209,21 @@ function DetailModal({ product, onClose, onEdit, onDelete }) {
   )
 }
 
+const tableFadeCss = `
+@keyframes tableFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-table-fade { animation: tableFadeIn 0.35s ease-out; }
+`
+
 export default function ProductTable({ products, loading, onEdit, onDelete, sortField, sortDir, onSort }) {
   const [detailProduct, setDetailProduct] = useState(null)
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 size={32} className="animate-spin text-purple-500" />
+        <Loader2 size={32} className="animate-spin text-[#7C3AED]" />
       </div>
     )
   }
@@ -223,13 +232,14 @@ export default function ProductTable({ products, loading, onEdit, onDelete, sort
     return (
       <div className="text-center py-20 text-gray-400">
         <p className="text-lg">No products found</p>
-        <p className="text-sm mt-1">Add a product or adjust your filters</p>
+        <p className="text-sm mt-1">Try adjusting your filters</p>
       </div>
     )
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto animate-table-fade">
+      <style>{tableFadeCss}</style>
       {detailProduct && (
         <DetailModal
           product={detailProduct}
@@ -239,12 +249,12 @@ export default function ProductTable({ products, loading, onEdit, onDelete, sort
         />
       )}
       <table className="w-full text-sm text-left">
-        <thead className="sticky top-0 z-10 bg-white">
-          <tr className="border-b border-gray-200">
+        <thead className="sticky top-0 z-10" style={{ background: 'linear-gradient(135deg, #7C3AED, #9F67F7)' }}>
+          <tr>
             {columns.map((col) => (
               <th
                 key={col.key}
-                className={`px-4 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider ${col.width} ${col.sortable ? 'cursor-pointer select-none hover:text-gray-700' : ''}`}
+                className={`px-4 py-3.5 text-xs font-bold text-white uppercase tracking-wider ${col.width} ${col.sortable ? 'cursor-pointer select-none hover:text-white/90' : ''}`}
                 onClick={() => col.sortable && onSort(col.key)}
               >
                 <span className="inline-flex items-center gap-1">
@@ -253,19 +263,27 @@ export default function ProductTable({ products, loading, onEdit, onDelete, sort
                 </span>
               </th>
             ))}
-            <th className="px-4 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider min-w-[100px] w-[6%]">
+            <th className="px-4 py-3.5 text-xs font-bold text-white uppercase tracking-wider min-w-[100px] w-[6%]">
               Actions
             </th>
           </tr>
         </thead>
         <tbody>
           {products.map((p, i) => {
-            const isLow = p.qty <= p.low_stock
+            const isOut = p.qty === 0
+            const isLow = !isOut && p.qty <= p.low_stock
+            const badgeClass = isOut
+              ? 'bg-gray-100 text-gray-600'
+              : isLow
+              ? 'bg-red-50 text-red-700'
+              : 'bg-green-50 text-green-700'
+            const dotClass = isOut ? 'bg-gray-400' : isLow ? 'bg-red-500' : 'bg-green-500'
+            const badgeLabel = isOut ? 'Out of Stock' : isLow ? 'Low Stock' : 'In Stock'
             return (
               <tr
                 key={p.id}
-                className={`border-b border-gray-100 hover:bg-purple-50/40 transition-colors cursor-pointer ${
-                  i % 2 === 1 ? 'bg-gray-50/50' : 'bg-white'
+                className={`border-b border-[#EDE9FE] hover:bg-[#EDE9FE]/60 transition-colors cursor-pointer ${
+                  i % 2 === 1 ? 'bg-[#F5F3FF]' : 'bg-white'
                 }`}
                 onClick={() => setDetailProduct(p)}
               >
@@ -274,11 +292,11 @@ export default function ProductTable({ products, loading, onEdit, onDelete, sort
                     <div className="shrink-0">
                       <ProductImage img={p.img} name={p.name} />
                     </div>
-                    <span className="font-semibold text-gray-900 truncate">{p.name}</span>
+                    <span className="font-bold text-[#7C3AED] truncate">{p.name}</span>
                   </div>
                 </td>
                 <td className="px-4 py-4">
-                  <span className="inline-block bg-gray-100 text-gray-700 text-xs px-2.5 py-1 rounded-full">
+                  <span className="inline-block bg-[#EDE9FE] text-[#7C3AED] text-xs font-medium px-2.5 py-1 rounded-full">
                     {p.category}
                   </span>
                 </td>
@@ -289,15 +307,9 @@ export default function ProductTable({ products, loading, onEdit, onDelete, sort
                 </td>
                 <td className="px-4 py-4 font-medium text-gray-900">{p.qty}</td>
                 <td className="px-4 py-4">
-                  <span
-                    className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${
-                      isLow
-                        ? 'bg-red-50 text-red-700'
-                        : 'bg-green-50 text-green-700'
-                    }`}
-                  >
-                    <span className={`w-1.5 h-1.5 rounded-full ${isLow ? 'bg-red-500' : 'bg-green-500'}`} />
-                    {isLow ? 'Low Stock' : 'In Stock'}
+                  <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${badgeClass}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${dotClass}`} />
+                    {badgeLabel}
                   </span>
                 </td>
                 <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
