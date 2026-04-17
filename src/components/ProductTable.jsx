@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Pencil, Trash2, ChevronUp, ChevronDown, Loader2, X, Eye } from 'lucide-react'
+import { Pencil, Trash2, ChevronUp, ChevronDown, Loader2, X, Eye, Search } from 'lucide-react'
 
 const columns = [
   { key: 'name', label: 'Product', sortable: true, width: 'min-w-[260px] w-[30%]' },
@@ -65,14 +65,71 @@ function ProductImage({ img, name, size = 'sm' }) {
   )
 }
 
+function ImageLightbox({ img, name, onClose }) {
+  useEffect(() => {
+    const handleKey = (e) => {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handleKey)
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', handleKey)
+      document.body.style.overflow = ''
+    }
+  }, [onClose])
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md cursor-pointer"
+      onClick={onClose}
+    >
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 z-[70] p-2 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+      >
+        <X size={24} />
+      </button>
+
+      <div
+        className="relative max-w-[90vw] max-h-[85vh] flex flex-col items-center"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {isHttpUrl(img) ? (
+          <img
+            src={img}
+            alt={name}
+            className="max-w-full max-h-[78vh] object-contain rounded-xl shadow-2xl"
+          />
+        ) : img && img.trim() ? (
+          <div className="w-80 h-80 rounded-xl bg-indigo-50 flex items-center justify-center text-9xl">
+            {img}
+          </div>
+        ) : (
+          <div className="w-80 h-80 rounded-xl bg-gray-100 flex items-center justify-center text-9xl">
+            🛍️
+          </div>
+        )}
+        <p className="mt-4 text-white text-lg font-semibold text-center drop-shadow-lg">{name}</p>
+      </div>
+    </div>
+  )
+}
+
 function DetailModal({ product, onClose, onEdit, onDelete }) {
   const p = product
   const isOut = p.qty === 0
   const isLow = !isOut && p.qty <= p.low_stock
+  const [lightboxOpen, setLightboxOpen] = useState(false)
 
   const handleKeyDown = useCallback((e) => {
-    if (e.key === 'Escape') onClose()
-  }, [onClose])
+    if (e.key === 'Escape') {
+      if (lightboxOpen) {
+        setLightboxOpen(false)
+      } else {
+        onClose()
+      }
+    }
+  }, [onClose, lightboxOpen])
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown)
@@ -106,8 +163,33 @@ function DetailModal({ product, onClose, onEdit, onDelete }) {
 
         {/* Image */}
         <div className="px-6 pt-5">
-          <ProductImage img={p.img} name={p.name} size="lg" />
+          <div
+            className="relative group cursor-pointer overflow-hidden rounded-xl"
+            onClick={() => setLightboxOpen(true)}
+          >
+            <ProductImage img={p.img} name={p.name} size="lg" />
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-300 flex items-center justify-center rounded-xl">
+              <Search size={32} className="text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 drop-shadow-lg" />
+            </div>
+            <style>{`
+              .group:hover img, .group:hover .w-full.h-64 {
+                transform: scale(1.05);
+                transition: transform 0.3s ease;
+              }
+              .group img, .group .w-full.h-64 {
+                transition: transform 0.3s ease;
+              }
+            `}</style>
+          </div>
         </div>
+
+        {lightboxOpen && (
+          <ImageLightbox
+            img={p.img}
+            name={p.name}
+            onClose={() => setLightboxOpen(false)}
+          />
+        )}
 
         {/* Info */}
         <div className="px-6 py-5 space-y-4">
