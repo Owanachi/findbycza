@@ -11,6 +11,7 @@ import LowStockAlert from './components/LowStockAlert'
 import Login from './components/Login'
 import Invoices from './pages/Invoices'
 import NewInvoice from './pages/NewInvoice'
+import InvoiceDetail from './pages/InvoiceDetail'
 
 const LOGO_URL = 'https://iixivpuyrxeoapsouszx.supabase.co/storage/v1/object/public/product-images/Logo.jpg'
 
@@ -338,21 +339,24 @@ function AppShell() {
   const { user, loading } = useAuth()
   const resolveRoute = useCallback(() => {
     const hash = window.location.hash.replace('#/', '')
-    if (hash === 'invoices/new') return 'invoices/new'
-    if (hash === 'invoices' || hash.startsWith('invoices/')) return 'invoices'
-    return 'inventory'
+    if (hash === 'invoices/new') return { page: 'invoices/new' }
+    const detailMatch = hash.match(/^invoices\/(.+)$/)
+    if (detailMatch) return { page: 'invoices/detail', invoiceId: detailMatch[1] }
+    if (hash === 'invoices') return { page: 'invoices' }
+    return { page: 'inventory' }
   }, [])
 
-  const [page, setPage] = useState(resolveRoute)
+  const [route, setRoute] = useState(resolveRoute)
+  const page = route.page
 
   const handleNavigate = useCallback((target) => {
-    setPage(target)
+    setRoute({ page: target })
     window.location.hash = target === 'inventory' ? '/' : `/${target}`
   }, [])
 
   useEffect(() => {
     function onHashChange() {
-      setPage(resolveRoute())
+      setRoute(resolveRoute())
     }
     window.addEventListener('hashchange', onHashChange)
     return () => window.removeEventListener('hashchange', onHashChange)
@@ -377,10 +381,19 @@ function AppShell() {
     )
   }
 
+  if (page === 'invoices/detail') {
+    return (
+      <div className="min-h-screen bg-white">
+        <Header page="invoices" onNavigate={handleNavigate} />
+        <InvoiceDetail invoiceId={route.invoiceId} />
+      </div>
+    )
+  }
+
   if (page === 'invoices') {
     return (
       <div className="min-h-screen bg-white">
-        <Header page={page} onNavigate={handleNavigate} />
+        <Header page="invoices" onNavigate={handleNavigate} />
         <Invoices onNavigate={handleNavigate} />
       </div>
     )
