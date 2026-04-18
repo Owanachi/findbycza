@@ -10,6 +10,7 @@ import Header from './components/Header'
 import LowStockAlert from './components/LowStockAlert'
 import Login from './components/Login'
 import Invoices from './pages/Invoices'
+import NewInvoice from './pages/NewInvoice'
 
 const LOGO_URL = 'https://iixivpuyrxeoapsouszx.supabase.co/storage/v1/object/public/product-images/Logo.jpg'
 
@@ -335,11 +336,14 @@ function Inventory({ page, onNavigate }) {
 
 function AppShell() {
   const { user, loading } = useAuth()
-  const [page, setPage] = useState(() => {
+  const resolveRoute = useCallback(() => {
     const hash = window.location.hash.replace('#/', '')
+    if (hash === 'invoices/new') return 'invoices/new'
     if (hash === 'invoices' || hash.startsWith('invoices/')) return 'invoices'
     return 'inventory'
-  })
+  }, [])
+
+  const [page, setPage] = useState(resolveRoute)
 
   const handleNavigate = useCallback((target) => {
     setPage(target)
@@ -348,16 +352,11 @@ function AppShell() {
 
   useEffect(() => {
     function onHashChange() {
-      const hash = window.location.hash.replace('#/', '')
-      if (hash === 'invoices' || hash.startsWith('invoices/')) {
-        setPage('invoices')
-      } else {
-        setPage('inventory')
-      }
+      setPage(resolveRoute())
     }
     window.addEventListener('hashchange', onHashChange)
     return () => window.removeEventListener('hashchange', onHashChange)
-  }, [])
+  }, [resolveRoute])
 
   if (loading) {
     return (
@@ -368,6 +367,15 @@ function AppShell() {
   }
 
   if (!user) return <Login />
+
+  if (page === 'invoices/new') {
+    return (
+      <div className="min-h-screen bg-white">
+        <Header page="invoices" onNavigate={handleNavigate} />
+        <NewInvoice />
+      </div>
+    )
+  }
 
   if (page === 'invoices') {
     return (
