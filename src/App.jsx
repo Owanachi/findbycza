@@ -9,10 +9,11 @@ import ProductModal from './components/ProductModal'
 import Header from './components/Header'
 import LowStockAlert from './components/LowStockAlert'
 import Login from './components/Login'
+import Invoices from './pages/Invoices'
 
 const LOGO_URL = 'https://iixivpuyrxeoapsouszx.supabase.co/storage/v1/object/public/product-images/Logo.jpg'
 
-function Inventory() {
+function Inventory({ page, onNavigate }) {
   const { user } = useAuth()
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(false)
@@ -184,7 +185,7 @@ function Inventory() {
 
   return (
     <div className="min-h-screen bg-white">
-      <Header onAdd={handleAdd} />
+      <Header onAdd={handleAdd} page={page} onNavigate={onNavigate} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Dashboard products={allProducts} />
@@ -334,6 +335,29 @@ function Inventory() {
 
 function AppShell() {
   const { user, loading } = useAuth()
+  const [page, setPage] = useState(() => {
+    const hash = window.location.hash.replace('#/', '')
+    if (hash === 'invoices' || hash.startsWith('invoices/')) return 'invoices'
+    return 'inventory'
+  })
+
+  const handleNavigate = useCallback((target) => {
+    setPage(target)
+    window.location.hash = target === 'inventory' ? '/' : `/${target}`
+  }, [])
+
+  useEffect(() => {
+    function onHashChange() {
+      const hash = window.location.hash.replace('#/', '')
+      if (hash === 'invoices' || hash.startsWith('invoices/')) {
+        setPage('invoices')
+      } else {
+        setPage('inventory')
+      }
+    }
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
+  }, [])
 
   if (loading) {
     return (
@@ -343,7 +367,18 @@ function AppShell() {
     )
   }
 
-  return user ? <Inventory /> : <Login />
+  if (!user) return <Login />
+
+  if (page === 'invoices') {
+    return (
+      <div className="min-h-screen bg-white">
+        <Header page={page} onNavigate={handleNavigate} />
+        <Invoices onNavigate={handleNavigate} />
+      </div>
+    )
+  }
+
+  return <Inventory page={page} onNavigate={handleNavigate} />
 }
 
 export default function App() {
