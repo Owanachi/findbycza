@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { ArrowLeft, Printer, XCircle, AlertTriangle, Loader2, Search, Package, Truck, CheckCircle2, X } from 'lucide-react'
+import { ArrowLeft, Printer, XCircle, AlertTriangle, Loader2, Search, Package, Truck, CheckCircle2, X, Edit3, Plus, Trash2, Save, DollarSign, Percent } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
@@ -33,6 +33,8 @@ const paymentStatusStyles = {
   Refunded: { bg: 'bg-gray-100 text-gray-600', stamp: 'text-gray-400/20' },
   Cancelled: { bg: 'bg-gray-200 text-gray-700', stamp: 'text-gray-500/20' },
 }
+
+const paymentMethods = ['Cash', 'GCash', 'Maya', 'BPI', 'BDO', 'PayPal (CC Payment)', 'GoTyme']
 
 // ─── Void Confirmation Modal ─────────────────────────────────────────
 function VoidModal({ onConfirm, onClose, voiding }) {
@@ -110,7 +112,6 @@ function LinkProductModal({ invoice, onClose, onLinked }) {
   }, [products, search])
 
   async function handleSelect(product) {
-    // Update fulfillment to Ready
     const { error } = await supabase
       .from('invoices')
       .update({ fulfillment_status: 'Ready', linked_product_id: product.id })
@@ -185,6 +186,526 @@ function LinkProductModal({ invoice, onClose, onLinked }) {
   )
 }
 
+// ─── Record Payment Modal ───────────────────────────────────────────
+function RecordPaymentModal({ invoice, onClose, onSaved, userEmail }) {
+  const [amount, setAmount] = useState('')
+  const [method, setMethod] = useState('Cash')
+  const [paymentDate, setPaymentDate] = useState(() => {
+    const now = new Date()
+    // Format for datetime-local input
+    const offset = 8 * 60 // Manila UTC+8
+    const manila = new Date(now.getTime() + (offset + now.getTimezoneOffset()) * 60000)
+    return manila.toISOString().slice(0, 16)
+  })
+  const [notes, setNotes] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    function onKey(e) { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  async function handleSave() {
+    const amt = Number(amount)
+    if (!amt || amt <= 0) {
+      toast.error('Amount must be greater than 0')
+      return
+    }
+    setSaving(true)
+
+    // Insert payment record
+    const { error: payErr } = await supabase.from('invoice_payments').insert([{
+      invoice_id: invoice.id,
+      amount: amt,
+      payment_method: method,
+      payment_date: new Date(paymentDate).toISOString(),
+      notes: notes.trim() || null,
+      recorded_by: userEmail || null,
+    }])
+
+    if (payErr) {
+      toast.error('Failed to record payment')
+      console.error(payErr)
+      setSaving(false)
+      return
+    }
+
+    // Recalculate total paid from all payments
+    const { data: payments } = await supabase
+      .from('invoice_payments')
+      .select('amount')
+      .eq('invoice_id', invoice.id)
+
+    const totalPaid = (payments || []).reduce((sum, p) => sum + Number(p.amount), 0)
+    const invoiceTotal = Number(invoice.total || 0)
+
+    let newStatus = 'Unpaid'
+    if (totalPaid >= invoiceTotal) newStatus = 'Paid'
+    else if (totalPaid > 0) newStatus = 'Partially Paid'
+
+    await supabase.from('invoices').update({
+      amount_paid: totalPaid,
+      payment_status: newStatus,
+      updated_by: userEmail || null,
+    }).eq('id', invoice.id)
+
+    toast.success('Payment recorded')
+    onSaved()
+    onClose()
+    setSaving(false)
+  }
+
+  const inputClass = 'w-full px-3 py-2 text-sm border-2 border-[#EDE9FE] rounded-xl focus:ring-4 focus:ring-[#EDE9FE] focus:border-[#7C3AED] outline-none transition-all'
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 print:hidden" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-3 mb-5">
+          <div className="p-2 rounded-full bg-green-100">
+            <DollarSign size={22} className="text-green-600" />
+          </div>
+          <h3 className="font-semibold text-gray-900 text-lg">Record Payment</h3>
+        </div>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Amount (₱)</label>
+            <input type="number" min="0" step="0.01" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} autoFocus className={inputClass} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Payment Method</label>
+            <select value={method} onChange={(e) => setMethod(e.target.value)} className={inputClass}>
+              {paymentMethods.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Payment Date</label>
+            <input type="datetime-local" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} className={inputClass} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Notes (optional)</label>
+            <input type="text" placeholder="e.g. Deposit, Final payment" value={notes} onChange={(e) => setNotes(e.target.value)} className={inputClass} />
+          </div>
+        </div>
+        <div className="flex gap-3 justify-end mt-6">
+          <button onClick={onClose} disabled={saving} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors">
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors disabled:opacity-50"
+          >
+            {saving ? <><Loader2 size={16} className="animate-spin" /> Saving...</> : <><DollarSign size={16} /> Record Payment</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Edit Invoice Modal ─────────────────────────────────────────────
+function EditInvoiceModal({ invoice, onClose, onSaved, userEmail }) {
+  const [customerName, setCustomerName] = useState(invoice.customer_name || '')
+  const [customerContact, setCustomerContact] = useState(invoice.customer_contact || '')
+  const [paymentMethod, setPaymentMethod] = useState(invoice.payment_method || '')
+  const [shippingOption, setShippingOption] = useState(invoice.shipping_option || '')
+  const [paymentStatus, setPaymentStatus] = useState(invoice.payment_status || 'Unpaid')
+  const [amountPaid, setAmountPaid] = useState(String(invoice.amount_paid || ''))
+  const [discountValue, setDiscountValue] = useState(String(invoice.discount || ''))
+  const [notes, setNotes] = useState(invoice.notes || '')
+  const [isPreorder, setIsPreorder] = useState(invoice.is_preorder || false)
+  const [expectedArrivalDate, setExpectedArrivalDate] = useState(invoice.expected_arrival_date || '')
+  const [fulfillmentStatus, setFulfillmentStatus] = useState(invoice.fulfillment_status || 'Pending')
+  const [lineItems, setLineItems] = useState((invoice.invoice_items || []).map((it) => ({
+    id: it.id,
+    product_id: it.product_id,
+    product_name: it.product_name,
+    product_category: it.product_category || '',
+    unit_price: it.unit_price,
+    qty: it.qty,
+  })))
+  const [saving, setSaving] = useState(false)
+  const [products, setProducts] = useState([])
+  const [pickerOpen, setPickerOpen] = useState(false)
+
+  useEffect(() => {
+    async function load() {
+      const { data } = await supabase.from('products').select('*').eq('status', 'active').order('name')
+      if (data) setProducts(data)
+    }
+    load()
+  }, [])
+
+  useEffect(() => {
+    function onKey(e) { if (e.key === 'Escape' && !pickerOpen) onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose, pickerOpen])
+
+  const alreadyAdded = useMemo(() => new Set(lineItems.map((li) => li.product_id)), [lineItems])
+
+  function addProduct(product) {
+    setLineItems((prev) => [...prev, {
+      id: null,
+      product_id: product.id,
+      product_name: product.name,
+      product_category: product.category || '',
+      unit_price: product.price,
+      qty: 1,
+    }])
+    setPickerOpen(false)
+  }
+
+  function updateLineItem(index, field, value) {
+    setLineItems((prev) => prev.map((li, i) => {
+      if (i !== index) return li
+      const updated = { ...li, [field]: value }
+      if (field === 'qty') updated.qty = Math.max(1, Number(value) || 1)
+      if (field === 'unit_price') updated.unit_price = Math.max(0, Number(value) || 0)
+      return updated
+    }))
+  }
+
+  function removeLineItem(index) {
+    setLineItems((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const subtotal = lineItems.reduce((sum, li) => sum + li.unit_price * li.qty, 0)
+  const discountAmount = Math.min(subtotal, Math.max(0, Number(discountValue) || 0))
+  const total = Math.max(0, subtotal - discountAmount)
+  const paidNum = Number(amountPaid) || 0
+
+  // Auto-fill amount_paid when switching to Paid
+  useEffect(() => {
+    if (paymentStatus === 'Paid' && total > 0) {
+      setAmountPaid(String(total))
+    }
+  }, [paymentStatus, total])
+
+  function validate() {
+    if (lineItems.length === 0) {
+      toast.error('Add at least one product')
+      return false
+    }
+    if (paymentStatus === 'Paid' && paidNum !== total) {
+      toast.error('Amount Paid must equal Total when status is "Paid"')
+      return false
+    }
+    if (paymentStatus === 'Partially Paid' && (paidNum <= 0 || paidNum >= total)) {
+      toast.error('Amount Paid must be > 0 and < Total for "Partially Paid"')
+      return false
+    }
+    if (paymentStatus === 'Unpaid' && paidNum !== 0) {
+      toast.error('Amount Paid should be 0 for "Unpaid" status')
+      return false
+    }
+    return true
+  }
+
+  async function handleSave() {
+    if (!validate()) return
+    setSaving(true)
+
+    // Build fulfillment timestamp updates
+    const fulfillmentUpdates = {}
+    const prevFulfillment = invoice.fulfillment_status || 'Pending'
+    if (isPreorder && fulfillmentStatus !== prevFulfillment) {
+      if (fulfillmentStatus === 'Shipped') {
+        fulfillmentUpdates.shipped_at = new Date().toISOString()
+      } else if (fulfillmentStatus === 'Delivered') {
+        fulfillmentUpdates.delivered_at = new Date().toISOString()
+      }
+      if (fulfillmentStatus === 'Pending' || fulfillmentStatus === 'Ready') {
+        fulfillmentUpdates.shipped_at = null
+        fulfillmentUpdates.delivered_at = null
+      }
+      if (fulfillmentStatus === 'Shipped') {
+        fulfillmentUpdates.delivered_at = null
+      }
+    }
+
+    const invoiceUpdate = {
+      customer_name: customerName.trim() || null,
+      customer_contact: customerContact.trim() || null,
+      subtotal,
+      discount: discountAmount,
+      total,
+      payment_method: paymentMethod || null,
+      shipping_option: shippingOption || null,
+      payment_status: paymentStatus,
+      amount_paid: paidNum,
+      is_preorder: isPreorder,
+      expected_arrival_date: isPreorder && expectedArrivalDate ? expectedArrivalDate : null,
+      fulfillment_status: isPreorder ? fulfillmentStatus : null,
+      notes: notes.trim() || null,
+      updated_by: userEmail || null,
+      ...fulfillmentUpdates,
+    }
+
+    const { error: invErr } = await supabase.from('invoices').update(invoiceUpdate).eq('id', invoice.id)
+    if (invErr) {
+      toast.error('Failed to update invoice')
+      console.error(invErr)
+      setSaving(false)
+      return
+    }
+
+    // Delete old line items and insert new ones
+    await supabase.from('invoice_items').delete().eq('invoice_id', invoice.id)
+
+    const items = lineItems.map((li) => ({
+      invoice_id: invoice.id,
+      product_id: li.product_id,
+      product_name: li.product_name,
+      product_category: li.product_category,
+      qty: li.qty,
+      unit_price: li.unit_price,
+      line_total: li.unit_price * li.qty,
+    }))
+
+    const { error: itemsErr } = await supabase.from('invoice_items').insert(items)
+    if (itemsErr) {
+      toast.error('Failed to update line items')
+      console.error(itemsErr)
+      setSaving(false)
+      return
+    }
+
+    toast.success('Invoice updated successfully')
+    onSaved()
+    onClose()
+    setSaving(false)
+  }
+
+  const inputClass = 'w-full px-3 py-2 text-sm border-2 border-[#EDE9FE] rounded-xl focus:ring-4 focus:ring-[#EDE9FE] focus:border-[#7C3AED] outline-none transition-all'
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 print:hidden overflow-y-auto py-8" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-full bg-[#EDE9FE]">
+              <Edit3 size={22} className="text-[#7C3AED]" />
+            </div>
+            <h3 className="font-semibold text-gray-900 text-lg">Edit Invoice</h3>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
+            <X size={20} className="text-gray-400" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Left column */}
+          <div className="space-y-4">
+            <h4 className="font-semibold text-gray-700 text-sm">Customer Info</h4>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Customer Name</label>
+              <input type="text" placeholder="Optional" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className={inputClass} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Contact</label>
+              <input type="text" placeholder="Optional" value={customerContact} onChange={(e) => setCustomerContact(e.target.value)} className={inputClass} />
+            </div>
+
+            <h4 className="font-semibold text-gray-700 text-sm pt-2">Payment</h4>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Payment Method</label>
+              <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className={inputClass}>
+                <option value="">Select...</option>
+                {paymentMethods.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Shipping Option</label>
+              <select value={shippingOption} onChange={(e) => setShippingOption(e.target.value)} className={inputClass}>
+                <option value="">Select...</option>
+                <option value="J&T">J&T</option>
+                <option value="Lalamove">Lalamove</option>
+                <option value="LBC">LBC</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Payment Status</label>
+              <select value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)} className={inputClass}>
+                <option value="Unpaid">Unpaid</option>
+                <option value="Partially Paid">Partially Paid</option>
+                <option value="Paid">Paid</option>
+                <option value="Refunded">Refunded</option>
+                <option value="Cancelled">Cancelled</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Amount Paid (₱)</label>
+              <input type="number" min="0" step="0.01" placeholder="0.00" value={amountPaid} onChange={(e) => setAmountPaid(e.target.value)} className={inputClass} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Discount (₱)</label>
+              <input type="number" min="0" step="0.01" placeholder="0" value={discountValue} onChange={(e) => setDiscountValue(e.target.value)} className={inputClass} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
+              <textarea placeholder="Optional notes..." value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className={inputClass + ' resize-none'} />
+            </div>
+
+            {/* Pre-order */}
+            <div className="pt-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={isPreorder} onChange={(e) => setIsPreorder(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-[#7C3AED] focus:ring-[#7C3AED]" />
+                <span className="text-sm font-semibold text-gray-800">Pre-order</span>
+              </label>
+              {isPreorder && (
+                <div className="mt-3 space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Expected Arrival Date</label>
+                    <input type="date" value={expectedArrivalDate} onChange={(e) => setExpectedArrivalDate(e.target.value)} className={inputClass} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Fulfillment Status</label>
+                    <select value={fulfillmentStatus} onChange={(e) => setFulfillmentStatus(e.target.value)} className={inputClass}>
+                      <option value="Pending">Pending</option>
+                      <option value="Ready">Ready</option>
+                      <option value="Shipped">Shipped</option>
+                      <option value="Delivered">Delivered</option>
+                      <option value="Cancelled">Cancelled</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right column - Line Items */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold text-gray-700 text-sm">Line Items</h4>
+              <button onClick={() => setPickerOpen(true)} className="inline-flex items-center gap-1 text-xs font-semibold text-[#7C3AED] hover:text-[#6D28D9] transition-colors">
+                <Plus size={14} /> Add Product
+              </button>
+            </div>
+
+            <div className="space-y-2 max-h-[400px] overflow-y-auto">
+              {lineItems.map((li, idx) => (
+                <div key={idx} className="bg-[#F5F3FF] rounded-xl p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-gray-800 truncate flex-1">{li.product_name}</p>
+                    <button onClick={() => removeLineItem(idx)} className="p-1 hover:bg-red-100 rounded-lg transition-colors">
+                      <Trash2 size={14} className="text-gray-400 hover:text-red-500" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="block text-[10px] text-gray-400">Price</label>
+                      <input type="number" min="0" step="0.01" value={li.unit_price} onChange={(e) => updateLineItem(idx, 'unit_price', e.target.value)} className="w-full px-2 py-1 text-xs border border-[#EDE9FE] rounded-lg focus:ring-1 focus:ring-[#7C3AED] outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-gray-400">Qty</label>
+                      <input type="number" min="1" value={li.qty} onChange={(e) => updateLineItem(idx, 'qty', e.target.value)} className="w-full px-2 py-1 text-xs border border-[#EDE9FE] rounded-lg focus:ring-1 focus:ring-[#7C3AED] outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-gray-400">Total</label>
+                      <p className="text-xs font-semibold text-gray-700 py-1">{formatCurrency(li.unit_price * li.qty)}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Summary */}
+            <div className="bg-gray-50 rounded-xl p-4 space-y-2 mt-4">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Subtotal</span>
+                <span className="font-medium">{formatCurrency(subtotal)}</span>
+              </div>
+              {discountAmount > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Discount</span>
+                  <span className="font-medium text-red-500">-{formatCurrency(discountAmount)}</span>
+                </div>
+              )}
+              <div className="border-t pt-2 flex justify-between">
+                <span className="font-semibold text-[#7C3AED]">Total</span>
+                <span className="font-bold text-[#7C3AED]">{formatCurrency(total)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-3 justify-end mt-6 pt-4 border-t border-gray-100">
+          <button onClick={onClose} disabled={saving} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors">
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving || lineItems.length === 0}
+            className="inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-[#7C3AED] hover:bg-[#6D28D9] rounded-lg transition-colors disabled:opacity-50"
+          >
+            {saving ? <><Loader2 size={16} className="animate-spin" /> Saving...</> : <><Save size={16} /> Save Changes</>}
+          </button>
+        </div>
+
+        {/* Product Picker within edit modal */}
+        {pickerOpen && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" onClick={() => setPickerOpen(false)}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[70vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-5 py-4 border-b border-[#EDE9FE]">
+                <h3 className="font-semibold text-[#7C3AED] text-lg">Add Product</h3>
+                <button onClick={() => setPickerOpen(false)} className="p-1 hover:bg-[#EDE9FE] rounded-lg transition-colors">
+                  <X size={20} className="text-gray-400" />
+                </button>
+              </div>
+              <div className="px-5 py-3 border-b border-[#EDE9FE]">
+                <div className="relative">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7C3AED]" />
+                  <PickerSearch products={products} alreadyAdded={alreadyAdded} onSelect={addProduct} />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function PickerSearch({ products, alreadyAdded, onSelect }) {
+  const [search, setSearch] = useState('')
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase()
+    return products.filter((p) => !alreadyAdded.has(p.id) && (p.name.toLowerCase().includes(q) || (p.category && p.category.toLowerCase().includes(q))))
+  }, [products, search, alreadyAdded])
+
+  return (
+    <>
+      <input
+        type="text"
+        placeholder="Search products..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        autoFocus
+        className="w-full pl-9 pr-4 py-2 text-sm border-2 border-[#EDE9FE] rounded-xl focus:ring-4 focus:ring-[#EDE9FE] focus:border-[#7C3AED] outline-none transition-all"
+      />
+      <div className="overflow-y-auto max-h-[50vh] p-2">
+        {filtered.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-sm text-gray-500">No matching products</p>
+          </div>
+        ) : (
+          filtered.map((p) => (
+            <button key={p.id} onClick={() => onSelect(p)} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#F5F3FF] transition-colors text-left">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-800 truncate">{p.name}</p>
+                <p className="text-xs text-gray-500">{p.category || 'Uncategorized'}</p>
+              </div>
+              <p className="text-sm font-semibold text-[#7C3AED]">{formatCurrency(p.price)}</p>
+            </button>
+          ))
+        )}
+      </div>
+    </>
+  )
+}
+
 // ─── Main Component ──────────────────────────────────────────────────
 export default function InvoiceDetail({ invoiceId }) {
   const { user } = useAuth()
@@ -195,6 +716,9 @@ export default function InvoiceDetail({ invoiceId }) {
   const [voiding, setVoiding] = useState(false)
   const [linkModalOpen, setLinkModalOpen] = useState(false)
   const [updatingFulfillment, setUpdatingFulfillment] = useState(false)
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false)
+  const [payments, setPayments] = useState([])
 
   const fetchInvoice = useCallback(async () => {
     setLoading(true)
@@ -212,9 +736,19 @@ export default function InvoiceDetail({ invoiceId }) {
     setLoading(false)
   }, [invoiceId])
 
+  const fetchPayments = useCallback(async () => {
+    const { data } = await supabase
+      .from('invoice_payments')
+      .select('*')
+      .eq('invoice_id', invoiceId)
+      .order('payment_date', { ascending: true })
+    if (data) setPayments(data)
+  }, [invoiceId])
+
   useEffect(() => {
     fetchInvoice()
-  }, [fetchInvoice])
+    fetchPayments()
+  }, [fetchInvoice, fetchPayments])
 
   async function handleVoid(reason) {
     setVoiding(true)
@@ -240,7 +774,19 @@ export default function InvoiceDetail({ invoiceId }) {
 
   async function updateFulfillment(newStatus, extras = {}) {
     setUpdatingFulfillment(true)
-    const updates = { fulfillment_status: newStatus, ...extras }
+    const updates = { fulfillment_status: newStatus, updated_by: user?.email || null, ...extras }
+
+    // Auto-timestamp shipping milestones
+    if (newStatus === 'Shipped') {
+      updates.shipped_at = new Date().toISOString()
+      updates.delivered_at = null
+    } else if (newStatus === 'Delivered') {
+      updates.delivered_at = new Date().toISOString()
+    } else if (newStatus === 'Pending' || newStatus === 'Ready') {
+      updates.shipped_at = null
+      updates.delivered_at = null
+    }
+
     const { error } = await supabase.from('invoices').update(updates).eq('id', invoiceId)
     if (error) {
       toast.error(`Failed to update to ${newStatus}`)
@@ -283,11 +829,12 @@ export default function InvoiceDetail({ invoiceId }) {
   const balanceDue = Math.max(0, (invoice.total || 0) - amountPaid)
   const isPreorder = invoice.is_preorder
   const fulfillment = invoice.fulfillment_status || 'Pending'
+  const totalPayments = payments.reduce((sum, p) => sum + Number(p.amount), 0)
 
   return (
     <>
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* ── Top bar (hidden in print) ── */}
+        {/* Top bar (hidden in print) */}
         <div className="flex items-center justify-between mb-6 print:hidden">
           <a
             href="#/invoices"
@@ -296,6 +843,22 @@ export default function InvoiceDetail({ invoiceId }) {
             <ArrowLeft size={18} /> Back to Invoices
           </a>
           <div className="flex items-center gap-2 flex-wrap">
+            {!isVoided && (
+              <button
+                onClick={() => setEditModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-[#7C3AED] hover:bg-[#EDE9FE] border border-[#EDE9FE] rounded-lg transition-colors"
+              >
+                <Edit3 size={16} /> Edit Invoice
+              </button>
+            )}
+            {!isVoided && (
+              <button
+                onClick={() => setPaymentModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-green-600 hover:bg-green-50 border border-green-200 rounded-lg transition-colors"
+              >
+                <DollarSign size={16} /> Record Payment
+              </button>
+            )}
             <button
               onClick={() => window.print()}
               className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-[#7C3AED] hover:bg-[#EDE9FE] border border-[#EDE9FE] rounded-lg transition-colors"
@@ -337,10 +900,7 @@ export default function InvoiceDetail({ invoiceId }) {
             )}
             {fulfillment === 'Shipped' && (
               <button
-                onClick={() => {
-                  const phNow = new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })
-                  updateFulfillment('Delivered', { delivered_at: new Date().toISOString() })
-                }}
+                onClick={() => updateFulfillment('Delivered')}
                 disabled={updatingFulfillment}
                 className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors disabled:opacity-50"
               >
@@ -354,7 +914,7 @@ export default function InvoiceDetail({ invoiceId }) {
           </div>
         )}
 
-        {/* ── Invoice card ── */}
+        {/* Invoice card */}
         <div className="bg-white rounded-2xl shadow-sm border border-[#EDE9FE] overflow-hidden relative print:shadow-none print:border-gray-200 print:rounded-none">
           {/* Voided watermark */}
           {isVoided && (
@@ -389,6 +949,12 @@ export default function InvoiceDetail({ invoiceId }) {
                 <span className="text-sm text-purple-700">
                   Fulfillment: <span className="font-semibold">{fulfillment}</span>
                 </span>
+                {invoice.shipped_at && (
+                  <span className="text-sm text-blue-700">
+                    Shipped: <span className="font-semibold">{formatDate(invoice.shipped_at)}</span>
+                    {invoice.shipping_option && <span className="text-blue-500"> via {invoice.shipping_option}</span>}
+                  </span>
+                )}
                 {invoice.delivered_at && (
                   <span className="text-sm text-green-700">
                     Delivered: <span className="font-semibold">{formatDate(invoice.delivered_at)}</span>
@@ -516,6 +1082,28 @@ export default function InvoiceDetail({ invoiceId }) {
               </div>
             </div>
 
+            {/* Payment History */}
+            {payments.length > 0 && (
+              <div className="mb-8 p-4 bg-[#F5F3FF] rounded-xl print:bg-gray-50 print:rounded-none print:border print:border-gray-200">
+                <p className="text-xs font-medium text-[#7C3AED] uppercase mb-3">Payment History</p>
+                <div className="border-t border-[#DDD6FE] mb-2" />
+                <div className="space-y-2">
+                  {payments.map((p) => (
+                    <div key={p.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                      <span className="text-gray-500 min-w-[160px]">{formatDate(p.payment_date)}</span>
+                      <span className="font-semibold text-gray-800 min-w-[100px]">{formatCurrency(p.amount)}</span>
+                      <span className="text-gray-600">{p.payment_method}</span>
+                      {p.notes && <span className="text-gray-400 italic">"{p.notes}"</span>}
+                    </div>
+                  ))}
+                </div>
+                <div className="border-t border-[#DDD6FE] mt-3 pt-2 flex justify-between text-sm">
+                  <span className="font-semibold text-[#7C3AED]">Total Paid</span>
+                  <span className="font-bold text-[#7C3AED]">{formatCurrency(totalPayments)}</span>
+                </div>
+              </div>
+            )}
+
             {/* Notes */}
             {invoice.notes && (
               <div className="mb-8 p-4 bg-[#F5F3FF] rounded-xl print:bg-gray-50 print:rounded-none print:border print:border-gray-200">
@@ -551,6 +1139,22 @@ export default function InvoiceDetail({ invoiceId }) {
       )}
       {linkModalOpen && (
         <LinkProductModal invoice={invoice} onClose={() => setLinkModalOpen(false)} onLinked={fetchInvoice} />
+      )}
+      {editModalOpen && (
+        <EditInvoiceModal
+          invoice={invoice}
+          onClose={() => setEditModalOpen(false)}
+          onSaved={() => { fetchInvoice(); fetchPayments() }}
+          userEmail={user?.email}
+        />
+      )}
+      {paymentModalOpen && (
+        <RecordPaymentModal
+          invoice={invoice}
+          onClose={() => setPaymentModalOpen(false)}
+          onSaved={() => { fetchInvoice(); fetchPayments() }}
+          userEmail={user?.email}
+        />
       )}
 
       {/* Print styles */}
