@@ -365,7 +365,7 @@ function Inventory({ page, onNavigate }) {
         )}
       </main>
 
-      {modalOpen && <ProductModal product={editProduct} onSave={handleSave} onClose={() => setModalOpen(false)} />}
+      {modalOpen && <ProductModal product={editProduct} allProducts={allProducts} onSave={handleSave} onClose={() => setModalOpen(false)} />}
 
       {filterSheetOpen && <FilterSheet onClose={() => setFilterSheetOpen(false)}>{filterControls}</FilterSheet>}
 

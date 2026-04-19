@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useMemo } from 'react'
-import { X, Upload, Loader2, GripVertical } from 'lucide-react'
+import { X, Upload, Loader2, GripVertical, Plus } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 
@@ -8,6 +8,13 @@ const MAX_IMAGES = 5
 const ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/webp']
 
 const emptyForm = { name: '', category: '', sub_category: '', rs_price: '', price: '', qty: '', low_stock: '', remarks: '', description: '' }
+
+function titleCase(str) {
+  if (!str) return ''
+  return str.trim().replace(/\s+/g, ' ').replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+}
+
+const ADD_NEW = '__add_new__'
 
 function getInitialImages(product) {
   if (!product) return []
@@ -21,7 +28,7 @@ function getInitialImages(product) {
   return []
 }
 
-export default function ProductModal({ product, onSave, onClose }) {
+export default function ProductModal({ product, allProducts = [], onSave, onClose }) {
   const [form, setForm] = useState(
     product
       ? {
@@ -49,8 +56,66 @@ export default function ProductModal({ product, onSave, onClose }) {
   const imagesRef = useRef(images)
   imagesRef.current = images
 
+  // Category / Sub-Category dropdown state
+  const [addingNewCategory, setAddingNewCategory] = useState(false)
+  const [newCategoryValue, setNewCategoryValue] = useState('')
+  const [addingNewSubCategory, setAddingNewSubCategory] = useState(false)
+  const [newSubCategoryValue, setNewSubCategoryValue] = useState('')
+
+  const categories = useMemo(() => {
+    return [...new Set(allProducts.map((p) => p.category).filter(Boolean))].sort()
+  }, [allProducts])
+
+  const subCategories = useMemo(() => {
+    if (!form.category) return []
+    return [...new Set(
+      allProducts
+        .filter((p) => p.category === form.category)
+        .map((p) => p.sub_category)
+        .filter(Boolean)
+    )].sort()
+  }, [allProducts, form.category])
+
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value })
+  }
+
+  const handleCategorySelect = (value) => {
+    if (value === ADD_NEW) {
+      setAddingNewCategory(true)
+      setNewCategoryValue('')
+      return
+    }
+    setForm((f) => ({ ...f, category: value, sub_category: '' }))
+    setAddingNewCategory(false)
+    setAddingNewSubCategory(false)
+    setNewSubCategoryValue('')
+  }
+
+  const confirmNewCategory = () => {
+    const normalized = titleCase(newCategoryValue)
+    if (!normalized) { toast.error('Category name is required'); return }
+    setForm((f) => ({ ...f, category: normalized, sub_category: '' }))
+    setAddingNewCategory(false)
+    setAddingNewSubCategory(false)
+    setNewSubCategoryValue('')
+  }
+
+  const handleSubCategorySelect = (value) => {
+    if (value === ADD_NEW) {
+      setAddingNewSubCategory(true)
+      setNewSubCategoryValue('')
+      return
+    }
+    setForm((f) => ({ ...f, sub_category: value }))
+    setAddingNewSubCategory(false)
+  }
+
+  const confirmNewSubCategory = () => {
+    const normalized = titleCase(newSubCategoryValue)
+    if (!normalized) { toast.error('Sub-category name is required'); return }
+    setForm((f) => ({ ...f, sub_category: normalized }))
+    setAddingNewSubCategory(false)
   }
 
   const processFiles = useCallback(async (files) => {
@@ -208,8 +273,8 @@ export default function ProductModal({ product, onSave, onClose }) {
 
     await onSave({
       name: form.name,
-      category: form.category,
-      sub_category: form.sub_category || null,
+      category: titleCase(form.category),
+      sub_category: form.sub_category ? titleCase(form.sub_category) : null,
       rs_price: form.rs_price !== '' ? parseFloat(form.rs_price) : null,
       price: parseFloat(form.price) || 0,
       qty: parseInt(form.qty) || 0,
@@ -338,22 +403,73 @@ export default function ProductModal({ product, onSave, onClose }) {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-              <input
-                name="category"
-                value={form.category}
-                onChange={handleChange}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7C3AED] focus:border-[#7C3AED] outline-none"
-              />
+              {addingNewCategory ? (
+                <div className="space-y-1.5">
+                  <input
+                    type="text"
+                    value={newCategoryValue}
+                    onChange={(e) => setNewCategoryValue(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); confirmNewCategory() } }}
+                    placeholder="Type new category name"
+                    autoFocus
+                    className="w-full px-3 py-2 border border-[#7C3AED] rounded-lg focus:ring-2 focus:ring-[#7C3AED] focus:border-[#7C3AED] outline-none text-sm"
+                  />
+                  <div className="flex gap-2">
+                    <button type="button" onClick={confirmNewCategory} className="text-xs font-semibold text-[#7C3AED] hover:text-[#6D28D9]">Save</button>
+                    <button type="button" onClick={() => { setAddingNewCategory(false); if (!form.category) setForm((f) => ({ ...f, category: '' })) }} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <select
+                  value={form.category}
+                  onChange={(e) => handleCategorySelect(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7C3AED] focus:border-[#7C3AED] outline-none text-sm"
+                >
+                  <option value="">Select category...</option>
+                  {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+                  {form.category && !categories.includes(form.category) && (
+                    <option value={form.category}>{form.category}</option>
+                  )}
+                  <option disabled>────────────</option>
+                  <option value={ADD_NEW}>+ Add new category...</option>
+                </select>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Sub-Category</label>
-              <input
-                name="sub_category"
-                value={form.sub_category}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7C3AED] focus:border-[#7C3AED] outline-none"
-              />
+              {addingNewSubCategory ? (
+                <div className="space-y-1.5">
+                  <input
+                    type="text"
+                    value={newSubCategoryValue}
+                    onChange={(e) => setNewSubCategoryValue(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); confirmNewSubCategory() } }}
+                    placeholder="Type new sub-category name"
+                    autoFocus
+                    className="w-full px-3 py-2 border border-[#7C3AED] rounded-lg focus:ring-2 focus:ring-[#7C3AED] focus:border-[#7C3AED] outline-none text-sm"
+                  />
+                  <div className="flex gap-2">
+                    <button type="button" onClick={confirmNewSubCategory} className="text-xs font-semibold text-[#7C3AED] hover:text-[#6D28D9]">Save</button>
+                    <button type="button" onClick={() => { setAddingNewSubCategory(false) }} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <select
+                  value={form.sub_category}
+                  onChange={(e) => handleSubCategorySelect(e.target.value)}
+                  disabled={!form.category}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7C3AED] focus:border-[#7C3AED] outline-none text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="">None (optional)</option>
+                  {subCategories.map((s) => <option key={s} value={s}>{s}</option>)}
+                  {form.sub_category && !subCategories.includes(form.sub_category) && (
+                    <option value={form.sub_category}>{form.sub_category}</option>
+                  )}
+                  <option disabled>────────────</option>
+                  <option value={ADD_NEW}>+ Add new sub-category...</option>
+                </select>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Price (₱)</label>
