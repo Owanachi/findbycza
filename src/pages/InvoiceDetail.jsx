@@ -9,7 +9,11 @@ const LOGO_URL = 'https://iixivpuyrxeoapsouszx.supabase.co/storage/v1/object/pub
 function formatDate(dateStr) {
   if (!dateStr) return '—'
   const d = new Date(dateStr)
-  return d.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
+  return d.toLocaleString('en-PH', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric', month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit', hour12: true
+  })
 }
 
 function formatCurrency(amount) {
@@ -221,11 +225,11 @@ export default function InvoiceDetail({ invoiceId }) {
               <div className="flex items-center gap-3">
                 <img
                   src={LOGO_URL}
-                  alt="Fabulous Finds by Cza"
+                  alt="Fabulous Finds by Za"
                   className="w-14 h-14 rounded-full object-cover ring-2 ring-[#EDE9FE] print:ring-gray-200"
                 />
                 <div>
-                  <h1 className="text-lg font-bold text-[#7C3AED] print:text-gray-900">Fabulous Finds by Cza</h1>
+                  <h1 className="text-lg font-bold text-[#7C3AED] print:text-gray-900">Fabulous Finds by Za</h1>
                   <p className="text-xs text-gray-400">Inventory &amp; Invoice System</p>
                 </div>
               </div>
@@ -267,7 +271,13 @@ export default function InvoiceDetail({ invoiceId }) {
                 {invoice.payment_method && (
                   <p className="text-sm text-gray-500">
                     <span className="text-xs font-medium text-gray-400 uppercase mr-1">Payment</span>
-                    {capitalize(invoice.payment_method)}
+                    {invoice.payment_method}
+                  </p>
+                )}
+                {invoice.shipping_option && (
+                  <p className="text-sm text-gray-500">
+                    <span className="text-xs font-medium text-gray-400 uppercase mr-1">Shipping</span>
+                    {invoice.shipping_option}
                   </p>
                 )}
                 {isVoided && invoice.voided_at && (
@@ -349,10 +359,10 @@ export default function InvoiceDetail({ invoiceId }) {
             {/* Footer */}
             <div className="border-t border-[#EDE9FE] print:border-gray-200 pt-6 text-center">
               <p className="text-sm font-medium text-[#7C3AED] print:text-gray-700">
-                Thank you for shopping with Fabulous Finds by Cza!
+                Thank you for shopping with Fabulous Finds by Za!
               </p>
               <p className="text-xs text-gray-400 mt-1">
-                Fabulous Finds by Cza &middot; Inventory &amp; Invoice System
+                Fabulous Finds by Za &middot; Inventory &amp; Invoice System
               </p>
             </div>
           </div>

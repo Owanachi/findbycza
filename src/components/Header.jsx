@@ -23,10 +23,10 @@ export default function Header({ onAdd, page, onNavigate }) {
           <div className="flex items-center gap-3">
             <img
               src={LOGO_URL}
-              alt="Fabulous Finds by Cza"
+              alt="Fabulous Finds by Za"
               className="w-11 h-11 rounded-full object-cover ring-2 ring-white/40 shadow-md"
             />
-            <h1 className="text-xl font-bold text-white tracking-tight">Fabulous Finds by Cza</h1>
+            <h1 className="text-xl font-bold text-white tracking-tight">Fabulous Finds by Za</h1>
             <nav className="hidden sm:flex items-center gap-1 ml-4 border-l border-white/20 pl-4">
               <button onClick={() => onNavigate('inventory')} className={navLinkClass('inventory')}>
                 <Package size={16} />

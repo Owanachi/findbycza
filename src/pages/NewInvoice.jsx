@@ -120,6 +120,7 @@ export default function NewInvoice() {
   const [customerName, setCustomerName] = useState('')
   const [customerContact, setCustomerContact] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('')
+  const [shippingOption, setShippingOption] = useState('')
   const [discountValue, setDiscountValue] = useState('')
   const [discountType, setDiscountType] = useState('amount') // 'amount' | 'percent'
   const [notes, setNotes] = useState('')
@@ -203,6 +204,7 @@ export default function NewInvoice() {
       discount: discountAmount,
       total,
       payment_method: paymentMethod || null,
+      shipping_option: shippingOption || null,
       status: 'active',
       notes: notes.trim() || null,
       created_by: user?.email || null,
@@ -419,11 +421,26 @@ export default function NewInvoice() {
                   className={inputClass}
                 >
                   <option value="">Select...</option>
-                  <option value="cash">Cash</option>
-                  <option value="gcash">GCash</option>
-                  <option value="maya">Maya</option>
-                  <option value="bank_transfer">Bank Transfer</option>
-                  <option value="other">Other</option>
+                  <option value="Cash">Cash</option>
+                  <option value="GCash">GCash</option>
+                  <option value="Maya">Maya</option>
+                  <option value="BPI">BPI</option>
+                  <option value="BDO">BDO</option>
+                  <option value="PayPal (CC Payment)">PayPal (CC Payment)</option>
+                  <option value="GoTyme">GoTyme</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Shipping Option</label>
+                <select
+                  value={shippingOption}
+                  onChange={(e) => setShippingOption(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">Select...</option>
+                  <option value="J&T">J&T</option>
+                  <option value="Lalamove">Lalamove</option>
+                  <option value="LBC">LBC</option>
                 </select>
               </div>
               <div>

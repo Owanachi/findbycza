@@ -36,10 +36,10 @@ export default function Login() {
           <div className="text-center">
             <img
               src={LOGO_URL}
-              alt="Fabulous Finds by Cza"
+              alt="Fabulous Finds by Za"
               className="w-24 h-24 rounded-full object-cover mx-auto mb-4 ring-4 ring-[#EDE9FE] shadow-lg"
             />
-            <h1 className="text-2xl font-bold text-[#7C3AED]">Fabulous Finds by Cza</h1>
+            <h1 className="text-2xl font-bold text-[#7C3AED]">Fabulous Finds by Za</h1>
             <p className="text-gray-500 mt-1 text-sm">Sign in to manage your inventory</p>
           </div>
 

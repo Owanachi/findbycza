@@ -198,7 +198,7 @@ function Inventory({ page, onNavigate }) {
         <div className="mt-10 flex flex-col items-center text-center">
           <img
             src={LOGO_URL}
-            alt="Fabulous Finds by Cza"
+            alt="Fabulous Finds by Za"
             className="w-[120px] h-[120px] rounded-full object-cover shadow-lg ring-4 ring-[#EDE9FE]"
           />
           <h2 className="mt-5 text-2xl font-bold text-[#7C3AED]">

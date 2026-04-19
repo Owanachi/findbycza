@@ -3,8 +3,13 @@ import { Plus, Search, Eye, FileText, Loader2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
 function formatDate(dateStr) {
+  if (!dateStr) return '—'
   const d = new Date(dateStr)
-  return d.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
+  return d.toLocaleString('en-PH', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric', month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit', hour12: true
+  })
 }
 
 function formatCurrency(amount) {
@@ -110,6 +115,7 @@ export default function Invoices({ onNavigate }) {
                     <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Date</th>
                     <th className="text-right px-4 py-3 font-semibold text-[#7C3AED]">Total</th>
                     <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Payment</th>
+                    <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Shipping</th>
                     <th className="text-center px-4 py-3 font-semibold text-[#7C3AED]">Status</th>
                     <th className="text-center px-4 py-3 font-semibold text-[#7C3AED]">Actions</th>
                   </tr>
@@ -127,9 +133,10 @@ export default function Invoices({ onNavigate }) {
                         {formatCurrency(inv.total)}
                       </td>
                       <td className="px-4 py-3 text-gray-600">
-                        {inv.payment_method
-                          ? inv.payment_method.charAt(0).toUpperCase() + inv.payment_method.slice(1)
-                          : '—'}
+                        {inv.payment_method || '—'}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">
+                        {inv.shipping_option || '—'}
                       </td>
                       <td className="px-4 py-3 text-center">
                         {inv.status === 'voided' ? (
