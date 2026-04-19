@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Pencil, Trash2, ChevronUp, ChevronDown, Loader2, X, Eye, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
+import { Pencil, Trash2, ChevronUp, ChevronDown, Loader2, X, Eye, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Camera } from 'lucide-react'
 
 const columns = [
   { key: 'name', label: 'Product', sortable: true, width: 'min-w-[260px] w-[30%]' },
@@ -24,6 +24,22 @@ function isHttpUrl(str) {
   return typeof str === 'string' && str.startsWith('http')
 }
 
+// Get all image URLs for a product, preferring image_urls array
+function getProductImages(product) {
+  if (product.image_urls && Array.isArray(product.image_urls) && product.image_urls.length > 0) {
+    return product.image_urls.filter(Boolean)
+  }
+  if (product.img && isHttpUrl(product.img)) return [product.img]
+  if (product.img && product.img.trim()) return [product.img] // emoji
+  return []
+}
+
+// Get cover image (first image)
+function getCoverImage(product) {
+  const imgs = getProductImages(product)
+  return imgs[0] || null
+}
+
 function SortIcon({ field, sortField, sortDir }) {
   if (field !== sortField) return <ChevronUp size={14} className="text-gray-300" />
   return sortDir === 'asc' ? (
@@ -33,26 +49,43 @@ function SortIcon({ field, sortField, sortDir }) {
   )
 }
 
-function ProductImage({ img, name, size = 'sm' }) {
+function ProductImage({ product, size = 'sm' }) {
+  const cover = getCoverImage(product)
+  const imageCount = getProductImages(product).length
   const sizeClass = size === 'lg' ? 'w-full h-64' : 'w-10 h-10'
   const roundClass = size === 'lg' ? 'rounded-xl' : 'rounded-lg'
 
-  if (isHttpUrl(img)) {
-    return <img src={img} alt={name} className={`${sizeClass} ${roundClass} object-cover`} />
+  if (isHttpUrl(cover)) {
+    return (
+      <div className="relative inline-block">
+        <img src={cover} alt={product.name} className={`${sizeClass} ${roundClass} object-cover`} />
+        {size === 'sm' && imageCount > 1 && (
+          <span className="absolute -bottom-1 -right-1 bg-[#7C3AED] text-white text-[9px] font-bold px-1 py-0.5 rounded-full flex items-center gap-0.5 shadow-sm">
+            <Camera size={8} />{imageCount}
+          </span>
+        )}
+      </div>
+    )
   }
-  if (img && img.trim()) {
-    return <div className={`${sizeClass} ${roundClass} bg-indigo-50 flex items-center justify-center ${size === 'lg' ? 'text-6xl' : 'text-xl'}`}>{img}</div>
+  if (cover && cover.trim()) {
+    return <div className={`${sizeClass} ${roundClass} bg-indigo-50 flex items-center justify-center ${size === 'lg' ? 'text-6xl' : 'text-xl'}`}>{cover}</div>
   }
   return <div className={`${sizeClass} ${roundClass} bg-gray-100 flex items-center justify-center ${size === 'lg' ? 'text-6xl' : 'text-xl'}`}>🛍️</div>
 }
 
-function ImageLightbox({ img, name, onClose }) {
+function ImageLightbox({ images, currentIndex, name, onClose, onChangeIndex }) {
   useEffect(() => {
-    const handleKey = (e) => { if (e.key === 'Escape') onClose() }
+    const handleKey = (e) => {
+      if (e.key === 'Escape') onClose()
+      if (e.key === 'ArrowLeft' && currentIndex > 0) onChangeIndex(currentIndex - 1)
+      if (e.key === 'ArrowRight' && currentIndex < images.length - 1) onChangeIndex(currentIndex + 1)
+    }
     document.addEventListener('keydown', handleKey)
     document.body.style.overflow = 'hidden'
     return () => { document.removeEventListener('keydown', handleKey); document.body.style.overflow = '' }
-  }, [onClose])
+  }, [onClose, currentIndex, images.length, onChangeIndex])
+
+  const img = images[currentIndex]
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md cursor-pointer" onClick={onClose}>
@@ -60,6 +93,18 @@ function ImageLightbox({ img, name, onClose }) {
         <X size={24} />
       </button>
       <div className="relative max-w-[90vw] max-h-[85vh] flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
+        {/* Nav arrows */}
+        {images.length > 1 && currentIndex > 0 && (
+          <button onClick={() => onChangeIndex(currentIndex - 1)} className="absolute left-2 top-1/2 -translate-y-1/2 z-[70] p-2 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-colors">
+            <ChevronLeft size={28} />
+          </button>
+        )}
+        {images.length > 1 && currentIndex < images.length - 1 && (
+          <button onClick={() => onChangeIndex(currentIndex + 1)} className="absolute right-2 top-1/2 -translate-y-1/2 z-[70] p-2 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-colors">
+            <ChevronRight size={28} />
+          </button>
+        )}
+
         {isHttpUrl(img) ? (
           <img src={img} alt={name} className="max-w-full max-h-[78vh] object-contain rounded-xl shadow-2xl" />
         ) : img && img.trim() ? (
@@ -68,7 +113,78 @@ function ImageLightbox({ img, name, onClose }) {
           <div className="w-80 h-80 rounded-xl bg-gray-100 flex items-center justify-center text-9xl">🛍️</div>
         )}
         <p className="mt-4 text-white text-lg font-semibold text-center drop-shadow-lg">{name}</p>
+        {images.length > 1 && (
+          <p className="mt-1 text-white/60 text-sm">{currentIndex + 1} / {images.length}</p>
+        )}
       </div>
+    </div>
+  )
+}
+
+// ─── Image Gallery / Carousel ───────────────────────────────────────
+function ImageGallery({ product, onLightbox }) {
+  const images = getProductImages(product)
+  const [currentIdx, setCurrentIdx] = useState(0)
+
+  if (images.length === 0) {
+    return (
+      <div className="w-full h-64 rounded-xl bg-gray-100 flex items-center justify-center text-6xl">🛍️</div>
+    )
+  }
+
+  const current = images[currentIdx]
+
+  return (
+    <div>
+      {/* Main image */}
+      <div className="relative group cursor-pointer overflow-hidden rounded-xl" onClick={() => onLightbox(currentIdx)}>
+        {isHttpUrl(current) ? (
+          <img src={current} alt={product.name} className="w-full h-64 rounded-xl object-cover" />
+        ) : (
+          <div className="w-full h-64 rounded-xl bg-indigo-50 flex items-center justify-center text-6xl">{current}</div>
+        )}
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-300 flex items-center justify-center rounded-xl">
+          <Search size={32} className="text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 drop-shadow-lg" />
+        </div>
+        {/* Prev/Next arrows on main image */}
+        {images.length > 1 && currentIdx > 0 && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setCurrentIdx((i) => i - 1) }}
+            className="absolute left-2 top-1/2 -translate-y-1/2 p-1 bg-black/30 hover:bg-black/50 text-white rounded-full transition-colors"
+          >
+            <ChevronLeft size={20} />
+          </button>
+        )}
+        {images.length > 1 && currentIdx < images.length - 1 && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setCurrentIdx((i) => i + 1) }}
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 bg-black/30 hover:bg-black/50 text-white rounded-full transition-colors"
+          >
+            <ChevronRight size={20} />
+          </button>
+        )}
+      </div>
+
+      {/* Thumbnails strip */}
+      {images.length > 1 && (
+        <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
+          {images.map((img, idx) => (
+            <button
+              key={idx}
+              onClick={() => setCurrentIdx(idx)}
+              className={`shrink-0 w-14 h-14 rounded-lg overflow-hidden border-2 transition-all ${
+                idx === currentIdx ? 'border-[#7C3AED] ring-2 ring-[#7C3AED]/30' : 'border-transparent hover:border-gray-300'
+              }`}
+            >
+              {isHttpUrl(img) ? (
+                <img src={img} alt={`Thumb ${idx + 1}`} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-indigo-50 flex items-center justify-center text-lg">{img}</div>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -78,6 +194,8 @@ function DetailModal({ product, onClose, onEdit, onDelete }) {
   const isOut = p.qty === 0
   const isLow = !isOut && p.qty <= p.low_stock
   const [lightboxOpen, setLightboxOpen] = useState(false)
+  const [lightboxIdx, setLightboxIdx] = useState(0)
+  const images = getProductImages(p)
 
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Escape') {
@@ -91,6 +209,11 @@ function DetailModal({ product, onClose, onEdit, onDelete }) {
     document.body.style.overflow = 'hidden'
     return () => { document.removeEventListener('keydown', handleKeyDown); document.body.style.overflow = '' }
   }, [handleKeyDown])
+
+  function openLightbox(idx) {
+    setLightboxIdx(idx)
+    setLightboxOpen(true)
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex md:justify-end" onClick={onClose}>
@@ -107,15 +230,18 @@ function DetailModal({ product, onClose, onEdit, onDelete }) {
         </div>
 
         <div className="px-6 pt-5">
-          <div className="relative group cursor-pointer overflow-hidden rounded-xl" onClick={() => setLightboxOpen(true)}>
-            <ProductImage img={p.img} name={p.name} size="lg" />
-            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-300 flex items-center justify-center rounded-xl">
-              <Search size={32} className="text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 drop-shadow-lg" />
-            </div>
-          </div>
+          <ImageGallery product={p} onLightbox={openLightbox} />
         </div>
 
-        {lightboxOpen && <ImageLightbox img={p.img} name={p.name} onClose={() => setLightboxOpen(false)} />}
+        {lightboxOpen && (
+          <ImageLightbox
+            images={images}
+            currentIndex={lightboxIdx}
+            name={p.name}
+            onClose={() => setLightboxOpen(false)}
+            onChangeIndex={setLightboxIdx}
+          />
+        )}
 
         {/* Description */}
         <div className="px-6 pt-4">
@@ -294,7 +420,7 @@ function ProductCard({ product, onView, onEdit, onDelete }) {
     <div className="bg-white rounded-xl border border-[#EDE9FE] p-4 space-y-3" onClick={() => onView(p)}>
       <div className="flex items-start gap-3">
         <div className="shrink-0">
-          <ProductImage img={p.img} name={p.name} />
+          <ProductImage product={p} />
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-bold text-[#7C3AED] truncate">{p.name}</p>
@@ -416,7 +542,7 @@ export default function ProductTable({ products, loading, onEdit, onDelete, sort
                 >
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="shrink-0"><ProductImage img={p.img} name={p.name} /></div>
+                      <div className="shrink-0"><ProductImage product={p} /></div>
                       <span className="font-bold text-[#7C3AED] truncate">{p.name}</span>
                     </div>
                   </td>

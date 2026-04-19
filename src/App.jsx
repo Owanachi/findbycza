@@ -175,8 +175,22 @@ function Inventory({ page, onNavigate }) {
 
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this product?')) return
+    // Find product to get image URLs for storage cleanup
+    const prod = allProducts.find((p) => p.id === id)
     const { error } = await supabase.from('products').delete().eq('id', id)
-    if (error) { toast.error('Delete failed') } else { toast.success('Product deleted'); fetchAllProducts(); if (hasActiveFilters) fetchProducts() }
+    if (error) { toast.error('Delete failed'); return }
+    // Delete images from storage
+    if (prod) {
+      const urls = prod.image_urls || (prod.img ? [prod.img] : [])
+      const filenames = urls
+        .filter((u) => typeof u === 'string' && u.includes('/product-images/'))
+        .map((u) => u.split('/product-images/').pop())
+        .filter(Boolean)
+      if (filenames.length > 0) {
+        await supabase.storage.from('product-images').remove(filenames)
+      }
+    }
+    toast.success('Product deleted'); fetchAllProducts(); if (hasActiveFilters) fetchProducts()
   }
 
   const DUPLICATE_MSG = 'A product with this name already exists in this category. Please use a different name or check existing inventory.'
@@ -192,7 +206,14 @@ function Inventory({ page, onNavigate }) {
     const { data: dups } = await dupQuery
     if (dups && dups.some((d) => !editProduct || d.id !== editProduct.id)) { toast.error(DUPLICATE_MSG); return }
 
-    const productWithUser = { ...product, updated_by: user?.email || null }
+    // Ensure backward compat: img = first image, image_urls = full array
+    const imageUrls = product.image_urls || []
+    const productWithUser = {
+      ...product,
+      image_urls: imageUrls,
+      img: imageUrls[0] || product.img || null,
+      updated_by: user?.email || null,
+    }
     if (editProduct) {
       const { error } = await supabase.from('products').update(productWithUser).eq('id', editProduct.id)
       if (error) { toast.error(error.code === '23505' ? DUPLICATE_MSG : 'Update failed'); return }
@@ -361,6 +382,8 @@ function AppShell() {
   const resolveRoute = useCallback(() => {
     const hash = window.location.hash.replace('#/', '')
     if (hash === 'invoices/new') return { page: 'invoices/new' }
+    const editMatch = hash.match(/^invoices\/(.+)\/edit$/)
+    if (editMatch) return { page: 'invoices/edit', invoiceId: editMatch[1] }
     const detailMatch = hash.match(/^invoices\/(.+)$/)
     if (detailMatch) return { page: 'invoices/detail', invoiceId: detailMatch[1] }
     if (hash === 'invoices') return { page: 'invoices' }
@@ -389,6 +412,7 @@ function AppShell() {
   if (!user) return <Login />
 
   if (pg === 'invoices/new') return <div className="min-h-screen bg-white"><Header page="invoices" onNavigate={handleNavigate} /><NewInvoice /></div>
+  if (pg === 'invoices/edit') return <div className="min-h-screen bg-white"><Header page="invoices" onNavigate={handleNavigate} /><InvoiceDetail invoiceId={route.invoiceId} autoEdit /></div>
   if (pg === 'invoices/detail') return <div className="min-h-screen bg-white"><Header page="invoices" onNavigate={handleNavigate} /><InvoiceDetail invoiceId={route.invoiceId} /></div>
   if (pg === 'invoices') return <div className="min-h-screen bg-white"><Header page="invoices" onNavigate={handleNavigate} /><Invoices onNavigate={handleNavigate} /></div>
   if (pg === 'preorders') return <div className="min-h-screen bg-white"><Header page="preorders" onNavigate={handleNavigate} /><Invoices onNavigate={handleNavigate} preorderOnly /></div>

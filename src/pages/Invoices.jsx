@@ -1,8 +1,6 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
-import { Plus, Search, Eye, FileText, Loader2, Package } from 'lucide-react'
-import { toast } from 'react-hot-toast'
+import { useState, useEffect, useMemo } from 'react'
+import { Plus, Search, Eye, FileText, Loader2, Package, Pencil } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../lib/AuthContext'
 
 function formatDate(dateStr) {
   if (!dateStr) return '—'
@@ -26,10 +24,6 @@ const paymentStatusStyles = {
   Cancelled: 'bg-gray-200 text-gray-700',
 }
 
-const shippingOptions = ['J&T', 'Lalamove', 'LBC']
-const fulfillmentOptions = ['Pending', 'Ready', 'Shipped', 'Delivered', 'Cancelled']
-const paymentStatusOptions = ['Unpaid', 'Partially Paid', 'Paid', 'Refunded', 'Cancelled']
-
 const fulfillmentStyles = {
   Pending: 'bg-yellow-100 text-yellow-700',
   Ready: 'bg-blue-100 text-blue-700',
@@ -44,233 +38,34 @@ const shippingStyles = {
   LBC: 'bg-red-100 text-red-700',
 }
 
-// ─── Popover component ──────────────────────────────────────────────
-function Popover({ anchorRef, onClose, children }) {
-  const popoverRef = useRef(null)
-
-  useEffect(() => {
-    function handleClick(e) {
-      if (popoverRef.current && !popoverRef.current.contains(e.target) &&
-          anchorRef.current && !anchorRef.current.contains(e.target)) {
-        onClose()
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [onClose, anchorRef])
-
+function PaymentStatusBadge({ status }) {
+  const s = status || 'Unpaid'
   return (
-    <div ref={popoverRef} className="absolute z-50 mt-1 bg-white rounded-xl shadow-lg border border-[#EDE9FE] py-1 min-w-[160px]" style={{ left: '50%', transform: 'translateX(-50%)' }}>
-      {children}
-    </div>
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${paymentStatusStyles[s] || paymentStatusStyles.Unpaid}`}>
+      {s}
+    </span>
   )
 }
 
-// ─── Clickable Payment Status Badge ─────────────────────────────────
-function PaymentStatusPopover({ invoice, onUpdate }) {
-  const [open, setOpen] = useState(false)
-  const [showAmountInput, setShowAmountInput] = useState(false)
-  const [partialAmount, setPartialAmount] = useState('')
-  const ref = useRef(null)
-
-  async function handleSelect(status) {
-    if (status === 'Partially Paid') {
-      setShowAmountInput(true)
-      return
-    }
-
-    const updates = { payment_status: status }
-    if (status === 'Paid') {
-      updates.amount_paid = invoice.total
-    } else if (status === 'Unpaid') {
-      updates.amount_paid = 0
-    }
-
-    const { error } = await supabase.from('invoices').update(updates).eq('id', invoice.id)
-    if (error) {
-      toast.error('Failed to update payment status')
-    } else {
-      toast.success(`Payment status updated to ${status}`)
-      onUpdate()
-    }
-    setOpen(false)
-    setShowAmountInput(false)
-  }
-
-  async function handlePartialSave() {
-    const amt = Number(partialAmount)
-    if (!amt || amt <= 0 || amt >= (invoice.total || 0)) {
-      toast.error('Amount must be > 0 and < Total')
-      return
-    }
-    const { error } = await supabase.from('invoices').update({ payment_status: 'Partially Paid', amount_paid: amt }).eq('id', invoice.id)
-    if (error) {
-      toast.error('Failed to update payment status')
-    } else {
-      toast.success('Payment status updated to Partially Paid')
-      onUpdate()
-    }
-    setOpen(false)
-    setShowAmountInput(false)
-    setPartialAmount('')
-  }
-
-  const s = invoice.payment_status || 'Unpaid'
-
+function ShippingBadge({ option }) {
+  if (!option) return <span className="text-gray-400 text-sm">—</span>
   return (
-    <div className="relative inline-block" ref={ref}>
-      <button
-        onClick={() => { setOpen(!open); setShowAmountInput(false); setPartialAmount('') }}
-        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold cursor-pointer hover:ring-2 hover:ring-[#7C3AED]/30 transition-all ${paymentStatusStyles[s] || paymentStatusStyles.Unpaid}`}
-      >
-        {s}
-      </button>
-      {open && (
-        <Popover anchorRef={ref} onClose={() => { setOpen(false); setShowAmountInput(false) }}>
-          {!showAmountInput ? (
-            paymentStatusOptions.map((opt) => (
-              <button
-                key={opt}
-                onClick={() => handleSelect(opt)}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-[#F5F3FF] transition-colors ${s === opt ? 'font-semibold text-[#7C3AED] bg-[#F5F3FF]' : 'text-gray-700'}`}
-              >
-                <span className={`inline-block w-2 h-2 rounded-full mr-2 ${paymentStatusStyles[opt]?.split(' ')[0] || ''}`} />
-                {opt}
-              </button>
-            ))
-          ) : (
-            <div className="p-3 space-y-2">
-              <p className="text-xs font-medium text-gray-500">Amount Paid</p>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={partialAmount}
-                  onChange={(e) => setPartialAmount(e.target.value)}
-                  autoFocus
-                  className="w-full px-2 py-1.5 text-sm border border-[#EDE9FE] rounded-lg focus:ring-2 focus:ring-[#7C3AED] outline-none"
-                />
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => setShowAmountInput(false)} className="flex-1 px-2 py-1.5 text-xs text-gray-500 hover:bg-gray-100 rounded-lg">Back</button>
-                <button onClick={handlePartialSave} className="flex-1 px-2 py-1.5 text-xs font-semibold text-white bg-[#7C3AED] hover:bg-[#6D28D9] rounded-lg">Save</button>
-              </div>
-            </div>
-          )}
-        </Popover>
-      )}
-    </div>
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${shippingStyles[option] || 'bg-gray-100 text-gray-600'}`}>
+      {option}
+    </span>
   )
 }
 
-// ─── Clickable Shipping Badge ───────────────────────────────────────
-function ShippingPopover({ invoice, onUpdate }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef(null)
-  const current = invoice.shipping_option || ''
-
-  async function handleSelect(opt) {
-    const val = opt === 'Not set' ? null : opt
-    const { error } = await supabase.from('invoices').update({ shipping_option: val }).eq('id', invoice.id)
-    if (error) {
-      toast.error('Failed to update shipping')
-    } else {
-      toast.success(`Shipping updated to ${opt}`)
-      onUpdate()
-    }
-    setOpen(false)
-  }
-
+function FulfillmentBadge({ status }) {
+  const s = status || 'Pending'
   return (
-    <div className="relative inline-block" ref={ref}>
-      <button
-        onClick={() => setOpen(!open)}
-        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold cursor-pointer hover:ring-2 hover:ring-[#7C3AED]/30 transition-all ${current ? (shippingStyles[current] || 'bg-gray-100 text-gray-600') : 'bg-gray-100 text-gray-400'}`}
-      >
-        {current || 'Not set'}
-      </button>
-      {open && (
-        <Popover anchorRef={ref} onClose={() => setOpen(false)}>
-          {['Not set', ...shippingOptions].map((opt) => (
-            <button
-              key={opt}
-              onClick={() => handleSelect(opt)}
-              className={`w-full text-left px-3 py-2 text-sm hover:bg-[#F5F3FF] transition-colors ${(opt === 'Not set' && !current) || current === opt ? 'font-semibold text-[#7C3AED] bg-[#F5F3FF]' : 'text-gray-700'}`}
-            >
-              {opt}
-            </button>
-          ))}
-        </Popover>
-      )}
-    </div>
-  )
-}
-
-// ─── Clickable Fulfillment Badge ────────────────────────────────────
-function FulfillmentPopover({ invoice, onUpdate }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef(null)
-  const current = invoice.fulfillment_status || 'Pending'
-
-  async function handleSelect(opt) {
-    const updates = { fulfillment_status: opt }
-
-    // Auto-timestamp shipping milestones
-    if (opt === 'Shipped') {
-      updates.shipped_at = new Date().toISOString()
-    } else if (opt === 'Delivered') {
-      updates.delivered_at = new Date().toISOString()
-    }
-
-    // Null out timestamps when going back
-    if (opt === 'Pending' || opt === 'Ready') {
-      updates.shipped_at = null
-      updates.delivered_at = null
-    }
-    if (opt === 'Shipped') {
-      updates.delivered_at = null
-    }
-
-    const { error } = await supabase.from('invoices').update(updates).eq('id', invoice.id)
-    if (error) {
-      toast.error('Failed to update fulfillment status')
-    } else {
-      toast.success(`Fulfillment status updated to ${opt}`)
-      onUpdate()
-    }
-    setOpen(false)
-  }
-
-  return (
-    <div className="relative inline-block" ref={ref}>
-      <button
-        onClick={() => setOpen(!open)}
-        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold cursor-pointer hover:ring-2 hover:ring-[#7C3AED]/30 transition-all ${fulfillmentStyles[current] || 'bg-gray-100 text-gray-600'}`}
-      >
-        {current}
-      </button>
-      {open && (
-        <Popover anchorRef={ref} onClose={() => setOpen(false)}>
-          {fulfillmentOptions.map((opt) => (
-            <button
-              key={opt}
-              onClick={() => handleSelect(opt)}
-              className={`w-full text-left px-3 py-2 text-sm hover:bg-[#F5F3FF] transition-colors ${current === opt ? 'font-semibold text-[#7C3AED] bg-[#F5F3FF]' : 'text-gray-700'}`}
-            >
-              <span className={`inline-block w-2 h-2 rounded-full mr-2 ${fulfillmentStyles[opt]?.split(' ')[0] || ''}`} />
-              {opt}
-            </button>
-          ))}
-        </Popover>
-      )}
-    </div>
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${fulfillmentStyles[s] || 'bg-gray-100 text-gray-600'}`}>
+      {s}
+    </span>
   )
 }
 
 export default function Invoices({ onNavigate, preorderOnly: initialPreorderOnly }) {
-  const { user } = useAuth()
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -278,19 +73,18 @@ export default function Invoices({ onNavigate, preorderOnly: initialPreorderOnly
   const [preorderOnly, setPreorderOnly] = useState(initialPreorderOnly || false)
   const [fulfillmentFilter, setFulfillmentFilter] = useState('All')
 
-  async function fetchInvoices() {
-    setLoading(true)
-    const { data, error } = await supabase
-      .from('invoices')
-      .select('*')
-      .order('created_at', { ascending: false })
-    if (!error && data) {
-      setInvoices(data)
-    }
-    setLoading(false)
-  }
-
   useEffect(() => {
+    async function fetchInvoices() {
+      setLoading(true)
+      const { data, error } = await supabase
+        .from('invoices')
+        .select('*')
+        .order('created_at', { ascending: false })
+      if (!error && data) {
+        setInvoices(data)
+      }
+      setLoading(false)
+    }
     fetchInvoices()
   }, [])
 
@@ -477,15 +271,15 @@ export default function Invoices({ onNavigate, preorderOnly: initialPreorderOnly
                       </td>
                       <td className="px-4 py-3 text-gray-600">{inv.payment_method || '—'}</td>
                       <td className="px-4 py-3 text-center">
-                        <PaymentStatusPopover invoice={inv} onUpdate={fetchInvoices} />
+                        <PaymentStatusBadge status={inv.payment_status} />
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <ShippingPopover invoice={inv} onUpdate={fetchInvoices} />
+                        <ShippingBadge option={inv.shipping_option} />
                       </td>
                       {preorderOnly && (
                         <td className="px-4 py-3 text-center">
                           {inv.is_preorder ? (
-                            <FulfillmentPopover invoice={inv} onUpdate={fetchInvoices} />
+                            <FulfillmentBadge status={inv.fulfillment_status} />
                           ) : '—'}
                         </td>
                       )}
@@ -501,13 +295,22 @@ export default function Invoices({ onNavigate, preorderOnly: initialPreorderOnly
                         )}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <a
-                          href={`#/invoices/${inv.id}`}
-                          className="inline-flex items-center gap-1 text-[#7C3AED] hover:text-[#6D28D9] font-medium text-sm transition-colors"
-                        >
-                          <Eye size={15} />
-                          View
-                        </a>
+                        <div className="inline-flex items-center gap-2">
+                          <a
+                            href={`#/invoices/${inv.id}`}
+                            className="inline-flex items-center gap-1 text-[#7C3AED] hover:text-[#6D28D9] font-medium text-sm transition-colors"
+                          >
+                            <Eye size={15} />
+                            View
+                          </a>
+                          <a
+                            href={`#/invoices/${inv.id}/edit`}
+                            className="inline-flex items-center gap-1 text-gray-400 hover:text-[#7C3AED] font-medium text-sm transition-colors"
+                            title="Edit Invoice"
+                          >
+                            <Pencil size={14} />
+                          </a>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -537,11 +340,9 @@ export default function Invoices({ onNavigate, preorderOnly: initialPreorderOnly
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 mb-3">
-                  <PaymentStatusPopover invoice={inv} onUpdate={fetchInvoices} />
-                  <ShippingPopover invoice={inv} onUpdate={fetchInvoices} />
-                  {inv.is_preorder && (
-                    <FulfillmentPopover invoice={inv} onUpdate={fetchInvoices} />
-                  )}
+                  <PaymentStatusBadge status={inv.payment_status} />
+                  <ShippingBadge option={inv.shipping_option} />
+                  {inv.is_preorder && <FulfillmentBadge status={inv.fulfillment_status} />}
                   {inv.status === 'voided' ? (
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">Voided</span>
                   ) : (
@@ -551,13 +352,22 @@ export default function Invoices({ onNavigate, preorderOnly: initialPreorderOnly
 
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-gray-500">{inv.payment_method || '—'}</span>
-                  <a
-                    href={`#/invoices/${inv.id}`}
-                    className="inline-flex items-center gap-1 text-[#7C3AED] hover:text-[#6D28D9] font-medium text-sm transition-colors"
-                  >
-                    <Eye size={15} />
-                    View
-                  </a>
+                  <div className="inline-flex items-center gap-3">
+                    <a
+                      href={`#/invoices/${inv.id}`}
+                      className="inline-flex items-center gap-1 text-[#7C3AED] hover:text-[#6D28D9] font-medium text-sm transition-colors"
+                    >
+                      <Eye size={15} />
+                      View
+                    </a>
+                    <a
+                      href={`#/invoices/${inv.id}/edit`}
+                      className="inline-flex items-center gap-1 text-gray-400 hover:text-[#7C3AED] font-medium text-sm transition-colors"
+                      title="Edit Invoice"
+                    >
+                      <Pencil size={14} />
+                    </a>
+                  </div>
                 </div>
               </div>
             ))}

@@ -654,12 +654,7 @@ function EditInvoiceModal({ invoice, onClose, onSaved, userEmail }) {
                   <X size={20} className="text-gray-400" />
                 </button>
               </div>
-              <div className="px-5 py-3 border-b border-[#EDE9FE]">
-                <div className="relative">
-                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7C3AED]" />
-                  <PickerSearch products={products} alreadyAdded={alreadyAdded} onSelect={addProduct} />
-                </div>
-              </div>
+              <PickerSearch products={products} alreadyAdded={alreadyAdded} onSelect={addProduct} />
             </div>
           </div>
         )}
@@ -677,17 +672,23 @@ function PickerSearch({ products, alreadyAdded, onSelect }) {
 
   return (
     <>
-      <input
-        type="text"
-        placeholder="Search products..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        autoFocus
-        className="w-full pl-9 pr-4 py-2 text-sm border-2 border-[#EDE9FE] rounded-xl focus:ring-4 focus:ring-[#EDE9FE] focus:border-[#7C3AED] outline-none transition-all"
-      />
-      <div className="overflow-y-auto max-h-[50vh] p-2">
+      <div className="px-5 py-3 border-b border-[#EDE9FE]">
+        <div className="relative">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7C3AED]" />
+          <input
+            type="text"
+            placeholder="Search products..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            autoFocus
+            className="w-full pl-9 pr-4 py-2 text-sm border-2 border-[#EDE9FE] rounded-xl focus:ring-4 focus:ring-[#EDE9FE] focus:border-[#7C3AED] outline-none transition-all"
+          />
+        </div>
+      </div>
+      <div className="overflow-y-auto flex-1 p-2">
         {filtered.length === 0 ? (
-          <div className="text-center py-8">
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <Search size={28} className="text-gray-300 mb-2" />
             <p className="text-sm text-gray-500">No matching products</p>
           </div>
         ) : (
@@ -707,7 +708,7 @@ function PickerSearch({ products, alreadyAdded, onSelect }) {
 }
 
 // ─── Main Component ──────────────────────────────────────────────────
-export default function InvoiceDetail({ invoiceId }) {
+export default function InvoiceDetail({ invoiceId, autoEdit }) {
   const { user } = useAuth()
   const [invoice, setInvoice] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -719,6 +720,7 @@ export default function InvoiceDetail({ invoiceId }) {
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [paymentModalOpen, setPaymentModalOpen] = useState(false)
   const [payments, setPayments] = useState([])
+  const [autoEditDone, setAutoEditDone] = useState(false)
 
   const fetchInvoice = useCallback(async () => {
     setLoading(true)
@@ -749,6 +751,14 @@ export default function InvoiceDetail({ invoiceId }) {
     fetchInvoice()
     fetchPayments()
   }, [fetchInvoice, fetchPayments])
+
+  // Auto-open edit modal when navigating from list edit button
+  useEffect(() => {
+    if (autoEdit && invoice && !autoEditDone) {
+      setEditModalOpen(true)
+      setAutoEditDone(true)
+    }
+  }, [autoEdit, invoice, autoEditDone])
 
   async function handleVoid(reason) {
     setVoiding(true)
