@@ -45,6 +45,9 @@ export default function ProductModal({ product, onSave, onClose }) {
   const fileRef = useRef(null)
   // Track URLs that were removed from an existing product (to delete from storage on save)
   const [removedUrls, setRemovedUrls] = useState([])
+  // Ref tracks live image count so async processFiles never reads stale closure
+  const imagesRef = useRef(images)
+  imagesRef.current = images
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value })
@@ -52,7 +55,8 @@ export default function ProductModal({ product, onSave, onClose }) {
 
   const processFiles = useCallback(async (files) => {
     const fileList = Array.from(files)
-    const currentCount = images.length
+    // Read live count from ref to avoid stale closure across sequential awaits
+    const currentCount = imagesRef.current.length
     const remaining = MAX_IMAGES - currentCount
 
     if (remaining <= 0) {
@@ -66,6 +70,12 @@ export default function ProductModal({ product, onSave, onClose }) {
     }
 
     for (const file of toProcess) {
+      // Re-check live count before each upload in case another batch added images
+      if (imagesRef.current.length >= MAX_IMAGES) {
+        toast.error(`Maximum ${MAX_IMAGES} images reached`)
+        break
+      }
+
       if (!ACCEPTED_TYPES.includes(file.type)) {
         toast.error(`${file.name}: Only PNG, JPEG, and WebP allowed`)
         continue
@@ -78,7 +88,7 @@ export default function ProductModal({ product, onSave, onClose }) {
       const localUrl = URL.createObjectURL(file)
       const tempId = `temp_${Date.now()}_${Math.random()}`
 
-      // Add placeholder with local preview
+      // Add placeholder with local preview (appends to existing array)
       setImages((prev) => [...prev, { url: localUrl, status: 'uploading', tempId }])
 
       const ext = file.name.split('.').pop().toLowerCase()
@@ -106,7 +116,7 @@ export default function ProductModal({ product, onSave, onClose }) {
         )
       )
     }
-  }, [images.length])
+  }, []) // No deps needed — reads live count from imagesRef
 
   const handleImageUpload = (e) => {
     if (e.target.files?.length) processFiles(e.target.files)
@@ -154,7 +164,13 @@ export default function ProductModal({ product, onSave, onClose }) {
   const handleThumbDrop = (e, idx) => {
     e.preventDefault()
     e.stopPropagation()
-    if (dragIdx === null || dragIdx === idx) { setDragIdx(null); setDragOverIdx(null); return }
+    // If no internal drag active, this is an external file drop — forward to processFiles
+    if (dragIdx === null) {
+      setDragOverIdx(null)
+      if (e.dataTransfer?.files?.length) processFiles(e.dataTransfer.files)
+      return
+    }
+    if (dragIdx === idx) { setDragIdx(null); setDragOverIdx(null); return }
     setImages((prev) => {
       const updated = [...prev]
       const [moved] = updated.splice(dragIdx, 1)
