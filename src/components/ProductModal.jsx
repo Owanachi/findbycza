@@ -227,19 +227,6 @@ export default function ProductModal({ product, onSave, onClose }) {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">RS Price (₱)</label>
-              <input
-                name="rs_price"
-                type="number"
-                step="0.01"
-                min="0"
-                value={form.rs_price}
-                onChange={handleChange}
-                placeholder="Optional"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7C3AED] focus:border-[#7C3AED] outline-none"
-              />
-            </div>
-            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Price (₱)</label>
               <input
                 name="price"
@@ -249,7 +236,20 @@ export default function ProductModal({ product, onSave, onClose }) {
                 value={form.price}
                 onChange={handleChange}
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7C3AED] focus:border-[#7C3AED] outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7C3AED] focus:border-[#7C3AED] outline-none text-base"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">RS Price (₱)</label>
+              <input
+                name="rs_price"
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.rs_price}
+                onChange={handleChange}
+                placeholder="Optional"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7C3AED] focus:border-[#7C3AED] outline-none text-base"
               />
             </div>
             <div>
