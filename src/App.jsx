@@ -149,19 +149,51 @@ function Inventory({ page, onNavigate }) {
     }
   }
 
+  const DUPLICATE_MSG = 'A product with this name already exists in this category. Please use a different name or check existing inventory.'
+
   const handleSave = async (product) => {
+    // Duplicate check: same name + category + sub_category (case-insensitive, trimmed)
+    const nameKey = (product.name || '').trim().toLowerCase()
+    const catKey = (product.category || '').trim().toLowerCase()
+    const subKey = (product.sub_category || '').trim().toLowerCase()
+
+    let dupQuery = supabase
+      .from('products')
+      .select('id')
+      .ilike('name', nameKey)
+      .ilike('category', catKey)
+    if (subKey) {
+      dupQuery = dupQuery.ilike('sub_category', subKey)
+    } else {
+      dupQuery = dupQuery.or('sub_category.is.null,sub_category.eq.')
+    }
+    const { data: dups } = await dupQuery
+    const isDuplicate = dups && dups.some((d) => !editProduct || d.id !== editProduct.id)
+    if (isDuplicate) {
+      toast.error(DUPLICATE_MSG)
+      return
+    }
+
     const productWithUser = { ...product, updated_by: user?.email || null }
     if (editProduct) {
       const { error } = await supabase.from('products').update(productWithUser).eq('id', editProduct.id)
       if (error) {
-        toast.error('Update failed')
+        if (error.code === '23505') {
+          toast.error(DUPLICATE_MSG)
+        } else {
+          toast.error('Update failed')
+        }
         return
       }
       toast.success('Product updated')
     } else {
       const { error } = await supabase.from('products').insert([productWithUser])
       if (error) {
-        toast.error('Insert failed')
+        if (error.code === '23505') {
+          toast.error(DUPLICATE_MSG)
+        } else {
+          toast.error('Insert failed')
+        }
         return
       }
       toast.success('Product added')

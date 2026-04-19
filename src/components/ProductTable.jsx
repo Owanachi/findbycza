@@ -5,8 +5,8 @@ const columns = [
   { key: 'name', label: 'Product', sortable: true, width: 'min-w-[260px] w-[30%]' },
   { key: 'category', label: 'Category', sortable: true, width: 'min-w-[120px] w-[13%]' },
   { key: 'sub_category', label: 'Sub-Category', sortable: true, width: 'min-w-[120px] w-[13%]' },
-  { key: 'price', label: 'Price', sortable: true, width: 'min-w-[100px] w-[10%]' },
   { key: 'rs_price', label: 'RS Price', sortable: true, width: 'min-w-[100px] w-[10%]' },
+  { key: 'price', label: 'Price', sortable: true, width: 'min-w-[100px] w-[10%]' },
   { key: 'qty', label: 'Quantity', sortable: true, width: 'min-w-[90px] w-[8%]' },
   { key: 'status', label: 'Status', sortable: false, width: 'min-w-[110px] w-[10%]' },
 ]
@@ -190,6 +190,16 @@ function DetailModal({ product, onClose, onEdit, onDelete }) {
             onClose={() => setLightboxOpen(false)}
           />
         )}
+
+        {/* Description */}
+        <div className="px-6 pt-4">
+          <div className="text-[11px] uppercase tracking-wider text-gray-400 font-medium mb-1">Description</div>
+          {p.description ? (
+            <p className="text-sm text-gray-700 whitespace-pre-wrap">{p.description}</p>
+          ) : (
+            <p className="text-sm text-gray-400 italic">No description provided.</p>
+          )}
+        </div>
 
         {/* Info */}
         <div className="px-6 py-5 space-y-4">
@@ -383,10 +393,10 @@ export default function ProductTable({ products, loading, onEdit, onDelete, sort
                   </span>
                 </td>
                 <td className="px-4 py-4 text-gray-500 text-xs">{p.sub_category || '—'}</td>
-                <td className="px-4 py-4 font-medium text-gray-900">₱{Number(p.price).toFixed(2)}</td>
                 <td className="px-4 py-4 font-medium text-gray-500">
                   {p.rs_price != null ? `₱${Number(p.rs_price).toFixed(2)}` : '—'}
                 </td>
+                <td className="px-4 py-4 font-medium text-gray-900">₱{Number(p.price).toFixed(2)}</td>
                 <td className="px-4 py-4 font-medium text-gray-900">{p.qty}</td>
                 <td className="px-4 py-4">
                   <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${badgeClass}`}>

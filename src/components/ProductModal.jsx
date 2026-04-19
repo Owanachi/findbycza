@@ -6,7 +6,7 @@ import toast from 'react-hot-toast'
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5 MB
 const ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/webp']
 
-const emptyForm = { name: '', category: '', sub_category: '', rs_price: '', price: '', qty: '', low_stock: '', img: '', remarks: '' }
+const emptyForm = { name: '', category: '', sub_category: '', rs_price: '', price: '', qty: '', low_stock: '', img: '', remarks: '', description: '' }
 
 export default function ProductModal({ product, onSave, onClose }) {
   const [form, setForm] = useState(
@@ -21,6 +21,7 @@ export default function ProductModal({ product, onSave, onClose }) {
           low_stock: product.low_stock ?? '',
           img: product.img || '',
           remarks: product.remarks || '',
+          description: product.description || '',
         }
       : { ...emptyForm }
   )
@@ -119,6 +120,7 @@ export default function ProductModal({ product, onSave, onClose }) {
       low_stock: parseInt(form.low_stock) || 0,
       img: form.img || null,
       remarks: form.remarks || null,
+      description: form.description.trim() || null,
     })
     setSaving(false)
   }
@@ -284,6 +286,18 @@ export default function ProductModal({ product, onSave, onClose }) {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7C3AED] focus:border-[#7C3AED] outline-none"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <textarea
+              name="description"
+              value={form.description}
+              onChange={handleChange}
+              rows={5}
+              placeholder="Enter product details, features, materials, notes, etc."
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7C3AED] focus:border-[#7C3AED] outline-none resize-y"
+            />
           </div>
 
           <div className="flex justify-end gap-3 pt-2">
