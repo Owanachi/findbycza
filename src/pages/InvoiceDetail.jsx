@@ -490,7 +490,18 @@ function EditInvoiceModal({ invoice, onClose, onSaved, userEmail }) {
     toast.success('Invoice updated successfully')
     onSaved()
     onClose()
-    setSaving(false)
+  }
+
+  // Wrapped handleSave with try/finally to always reset spinner
+  const handleSaveWrapped = async () => {
+    try {
+      await handleSave()
+    } catch (err) {
+      console.error('Edit invoice failed:', err)
+      toast.error(`Failed to save: ${err.message}`)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const inputClass = 'w-full px-3 py-2 text-sm border-2 border-[#EDE9FE] rounded-xl focus:ring-4 focus:ring-[#EDE9FE] focus:border-[#7C3AED] outline-none transition-all'
@@ -680,7 +691,7 @@ function EditInvoiceModal({ invoice, onClose, onSaved, userEmail }) {
             Cancel
           </button>
           <button
-            onClick={handleSave}
+            onClick={handleSaveWrapped}
             disabled={saving || lineItems.length === 0}
             className="inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-[#7C3AED] hover:bg-[#6D28D9] rounded-lg transition-colors disabled:opacity-50"
           >
@@ -765,6 +776,8 @@ export default function InvoiceDetail({ invoiceId, autoEdit }) {
   const [paymentModalOpen, setPaymentModalOpen] = useState(false)
   const [payments, setPayments] = useState([])
   const [autoEditDone, setAutoEditDone] = useState(false)
+  const [completeModalOpen, setCompleteModalOpen] = useState(false)
+  const [completing, setCompleting] = useState(false)
 
   const fetchInvoice = useCallback(async () => {
     setLoading(true)
@@ -884,56 +897,74 @@ export default function InvoiceDetail({ invoiceId, autoEdit }) {
   const isPreorder = invoice.is_preorder
   const fulfillment = invoice.fulfillment_status || 'Pending'
   const totalPayments = payments.reduce((sum, p) => sum + Number(p.amount), 0)
-  const isLayaway = invoice.is_layaway
+  const isLayaway = invoice.is_layaway || false
   const layawayStatus = invoice.layaway_status || 'Active'
-  const [completeModalOpen, setCompleteModalOpen] = useState(false)
-  const [completing, setCompleting] = useState(false)
 
   async function handleLayawayComplete() {
     setCompleting(true)
-    // Update layaway status
-    await supabase.from('invoices').update({
-      layaway_status: 'Completed',
-      updated_by: user?.email || null,
-    }).eq('id', invoiceId)
+    try {
+      // Update layaway status
+      const { error: invErr } = await supabase.from('invoices').update({
+        layaway_status: 'Completed',
+        updated_by: user?.email || null,
+      }).eq('id', invoiceId)
+      if (invErr) { toast.error('Failed to complete layaway'); console.error(invErr); return }
 
-    // Release reservation and decrement stock for each line item
-    const items = invoice.invoice_items || []
-    for (const item of items) {
-      const { data: prod } = await supabase.from('products').select('qty, reserved_qty').eq('id', item.product_id).single()
-      if (prod) {
-        await supabase.from('products').update({
-          qty: Math.max(0, (prod.qty || 0) - item.qty),
-          reserved_qty: Math.max(0, (prod.reserved_qty || 0) - item.qty),
-        }).eq('id', item.product_id)
+      // Release reservation and decrement stock (non-blocking)
+      try {
+        const items = invoice.invoice_items || []
+        for (const item of items) {
+          const { data: prod } = await supabase.from('products').select('qty, reserved_qty').eq('id', item.product_id).single()
+          if (prod) {
+            await supabase.from('products').update({
+              qty: Math.max(0, (prod.qty || 0) - item.qty),
+              reserved_qty: Math.max(0, (prod.reserved_qty || 0) - item.qty),
+            }).eq('id', item.product_id)
+          }
+        }
+      } catch (reserveErr) {
+        console.warn('Failed to update inventory — reconcile manually:', reserveErr)
       }
-    }
 
-    toast.success('Layaway completed — inventory released')
-    setCompleteModalOpen(false)
-    setCompleting(false)
-    await fetchInvoice()
+      toast.success('Layaway completed — inventory released')
+      setCompleteModalOpen(false)
+      await fetchInvoice()
+    } catch (err) {
+      console.error('Layaway complete failed:', err)
+      toast.error(`Failed: ${err.message}`)
+    } finally {
+      setCompleting(false)
+    }
   }
 
   async function handleLayawayCancel(newStatus) {
-    // Release reservation only (no stock decrement)
-    const items = invoice.invoice_items || []
-    for (const item of items) {
-      const { data: prod } = await supabase.from('products').select('reserved_qty').eq('id', item.product_id).single()
-      if (prod) {
-        await supabase.from('products').update({
-          reserved_qty: Math.max(0, (prod.reserved_qty || 0) - item.qty),
-        }).eq('id', item.product_id)
+    try {
+      // Release reservation only (non-blocking)
+      try {
+        const items = invoice.invoice_items || []
+        for (const item of items) {
+          const { data: prod } = await supabase.from('products').select('reserved_qty').eq('id', item.product_id).single()
+          if (prod) {
+            await supabase.from('products').update({
+              reserved_qty: Math.max(0, (prod.reserved_qty || 0) - item.qty),
+            }).eq('id', item.product_id)
+          }
+        }
+      } catch (reserveErr) {
+        console.warn('Failed to release reservation — reconcile manually:', reserveErr)
       }
+
+      await supabase.from('invoices').update({
+        layaway_status: newStatus,
+        updated_by: user?.email || null,
+      }).eq('id', invoiceId)
+
+      toast.success(`Layaway ${newStatus.toLowerCase()} — reservation released`)
+      await fetchInvoice()
+    } catch (err) {
+      console.error('Layaway cancel failed:', err)
+      toast.error(`Failed: ${err.message}`)
     }
-
-    await supabase.from('invoices').update({
-      layaway_status: newStatus,
-      updated_by: user?.email || null,
-    }).eq('id', invoiceId)
-
-    toast.success(`Layaway ${newStatus.toLowerCase()} — reservation released`)
-    await fetchInvoice()
   }
 
   return (

@@ -230,83 +230,90 @@ export default function NewInvoice() {
     if (!validate()) return
     setSaving(true)
 
-    // For layaway, auto-calculate payment status
-    let finalPaymentStatus = paymentStatus
-    if (isLayaway) {
-      if (paidNum >= total) finalPaymentStatus = 'Paid'
-      else if (paidNum > 0) finalPaymentStatus = 'Partially Paid'
-      else finalPaymentStatus = 'Unpaid'
-    }
-
-    const invoiceRow = {
-      customer_name: customerName.trim() || null,
-      customer_contact: customerContact.trim() || null,
-      subtotal,
-      discount: discountAmount,
-      total,
-      payment_method: paymentMethod || null,
-      shipping_option: shippingOption || null,
-      payment_status: finalPaymentStatus,
-      amount_paid: paidNum,
-      is_preorder: isPreorder && !isLayaway,
-      expected_arrival_date: isPreorder && !isLayaway && expectedArrivalDate ? expectedArrivalDate : null,
-      fulfillment_status: isPreorder && !isLayaway ? fulfillmentStatus : null,
-      is_layaway: isLayaway,
-      layaway_deposit_amount: isLayaway ? (Number(layawayDepositAmount) || layawayDepositDefault) : null,
-      layaway_due_date: isLayaway ? layawayDueDate : null,
-      layaway_status: isLayaway ? layawayStatus : null,
-      status: 'active',
-      notes: notes.trim() || null,
-      created_by: user?.email || null,
-    }
-
-    const { data: invoice, error: invErr } = await supabase
-      .from('invoices')
-      .insert([invoiceRow])
-      .select()
-      .single()
-
-    if (invErr || !invoice) {
-      toast.error('Failed to create invoice')
-      console.error(invErr)
-      setSaving(false)
-      return
-    }
-
-    const items = lineItems.map((li) => ({
-      invoice_id: invoice.id,
-      product_id: li.product_id,
-      product_name: li.product_name,
-      product_category: li.product_category,
-      qty: li.qty,
-      unit_price: li.unit_price,
-      line_total: li.unit_price * li.qty,
-    }))
-
-    const { error: itemsErr } = await supabase.from('invoice_items').insert(items)
-
-    if (itemsErr) {
-      await supabase.from('invoices').delete().eq('id', invoice.id)
-      toast.error('Failed to save line items — invoice rolled back')
-      console.error(itemsErr)
-      setSaving(false)
-      return
-    }
-
-    // Reserve inventory for layaway
-    if (isLayaway && layawayStatus === 'Active') {
-      for (const li of lineItems) {
-        await supabase.rpc('increment_reserved_qty', { product_id_arg: li.product_id, qty_arg: li.qty }).catch(() => {
-          // Fallback: direct update
-          supabase.from('products').select('reserved_qty').eq('id', li.product_id).single().then(({ data }) => {
-            if (data) supabase.from('products').update({ reserved_qty: (data.reserved_qty || 0) + li.qty }).eq('id', li.product_id)
-          })
-        })
+    try {
+      // For layaway, auto-calculate payment status
+      let finalPaymentStatus = paymentStatus
+      if (isLayaway) {
+        if (paidNum >= total) finalPaymentStatus = 'Paid'
+        else if (paidNum > 0) finalPaymentStatus = 'Partially Paid'
+        else finalPaymentStatus = 'Unpaid'
       }
-    }
 
-    toast.success('Invoice created!')
-    window.location.hash = `/invoices/${invoice.id}`
+      const invoiceRow = {
+        customer_name: customerName.trim() || null,
+        customer_contact: customerContact.trim() || null,
+        subtotal,
+        discount: discountAmount,
+        total,
+        payment_method: paymentMethod || null,
+        shipping_option: shippingOption || null,
+        payment_status: finalPaymentStatus,
+        amount_paid: paidNum,
+        is_preorder: isPreorder && !isLayaway,
+        expected_arrival_date: isPreorder && !isLayaway && expectedArrivalDate ? expectedArrivalDate : null,
+        fulfillment_status: isPreorder && !isLayaway ? fulfillmentStatus : null,
+        is_layaway: isLayaway,
+        layaway_deposit_amount: isLayaway ? (Number(layawayDepositAmount) || layawayDepositDefault) : null,
+        layaway_due_date: isLayaway ? layawayDueDate : null,
+        layaway_status: isLayaway ? layawayStatus : null,
+        status: 'active',
+        notes: notes.trim() || null,
+        created_by: user?.email || null,
+      }
+
+      const { data: invoice, error: invErr } = await supabase
+        .from('invoices')
+        .insert([invoiceRow])
+        .select()
+        .single()
+
+      if (invErr || !invoice) {
+        toast.error(`Failed to create invoice: ${invErr?.message || 'Unknown error'}`)
+        console.error(invErr)
+        return
+      }
+
+      const items = lineItems.map((li) => ({
+        invoice_id: invoice.id,
+        product_id: li.product_id,
+        product_name: li.product_name,
+        product_category: li.product_category,
+        qty: li.qty,
+        unit_price: li.unit_price,
+        line_total: li.unit_price * li.qty,
+      }))
+
+      const { error: itemsErr } = await supabase.from('invoice_items').insert(items)
+
+      if (itemsErr) {
+        await supabase.from('invoices').delete().eq('id', invoice.id)
+        toast.error('Failed to save line items — invoice rolled back')
+        console.error(itemsErr)
+        return
+      }
+
+      // Reserve inventory for layaway (non-blocking — don't let this fail the invoice)
+      if (isLayaway && layawayStatus === 'Active') {
+        try {
+          for (const li of lineItems) {
+            const { data: prod } = await supabase.from('products').select('reserved_qty').eq('id', li.product_id).single()
+            if (prod) {
+              await supabase.from('products').update({ reserved_qty: (prod.reserved_qty || 0) + li.qty }).eq('id', li.product_id)
+            }
+          }
+        } catch (reserveErr) {
+          console.warn('Failed to update reserved_qty — reconcile manually:', reserveErr)
+        }
+      }
+
+      toast.success('Invoice created!')
+      window.location.hash = `/invoices/${invoice.id}`
+    } catch (err) {
+      console.error('Invoice save failed:', err)
+      toast.error(`Failed to save: ${err.message}`)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const inputClass =
