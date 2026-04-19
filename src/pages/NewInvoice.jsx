@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Plus, X, Search, Trash2, Save, Loader2, ArrowLeft, Percent, DollarSign, Package } from 'lucide-react'
+import { Plus, X, Search, Trash2, Save, Loader2, ArrowLeft, Percent, Package } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
@@ -53,15 +53,12 @@ function ProductPicker({ products, onSelect, onClose, alreadyAdded }) {
         className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#EDE9FE]">
           <h3 className="font-semibold text-[#7C3AED] text-lg">Add Product</h3>
           <button onClick={onClose} className="p-1 hover:bg-[#EDE9FE] rounded-lg transition-colors">
             <X size={20} className="text-gray-400" />
           </button>
         </div>
-
-        {/* Search */}
         <div className="px-5 py-3 border-b border-[#EDE9FE]">
           <div className="relative">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7C3AED]" />
@@ -75,8 +72,6 @@ function ProductPicker({ products, onSelect, onClose, alreadyAdded }) {
             />
           </div>
         </div>
-
-        {/* Product list */}
         <div className="overflow-y-auto flex-1 p-2">
           {filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -121,11 +116,15 @@ export default function NewInvoice() {
   const [customerContact, setCustomerContact] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('')
   const [shippingOption, setShippingOption] = useState('')
+  const [paymentStatus, setPaymentStatus] = useState('Unpaid')
+  const [amountPaid, setAmountPaid] = useState('')
+  const [isPreorder, setIsPreorder] = useState(false)
+  const [expectedArrivalDate, setExpectedArrivalDate] = useState('')
+  const [fulfillmentStatus, setFulfillmentStatus] = useState('Pending')
   const [discountValue, setDiscountValue] = useState('')
-  const [discountType, setDiscountType] = useState('amount') // 'amount' | 'percent'
+  const [discountType, setDiscountType] = useState('amount')
   const [notes, setNotes] = useState('')
 
-  // Fetch available products
   useEffect(() => {
     async function load() {
       const { data } = await supabase
@@ -139,7 +138,6 @@ export default function NewInvoice() {
     load()
   }, [])
 
-  // ── Line item helpers ──
   const alreadyAdded = useMemo(() => new Set(lineItems.map((li) => li.product_id)), [lineItems])
 
   function addProduct(product) {
@@ -179,7 +177,6 @@ export default function NewInvoice() {
     setLineItems((prev) => prev.filter((_, i) => i !== index))
   }
 
-  // ── Totals ──
   const subtotal = lineItems.reduce((sum, li) => sum + li.unit_price * li.qty, 0)
 
   const discountAmount = useMemo(() => {
@@ -190,13 +187,30 @@ export default function NewInvoice() {
   }, [discountValue, discountType, subtotal])
 
   const total = Math.max(0, subtotal - discountAmount)
+  const paidNum = Number(amountPaid) || 0
+  const balanceDue = Math.max(0, total - paidNum)
 
-  // ── Save ──
+  // Validation
+  function validate() {
+    if (lineItems.length === 0) {
+      toast.error('Add at least one product')
+      return false
+    }
+    if (paymentStatus === 'Paid' && paidNum !== total) {
+      toast.error('Amount Paid must equal Total when status is "Paid"')
+      return false
+    }
+    if (paymentStatus === 'Partially Paid' && (paidNum <= 0 || paidNum >= total)) {
+      toast.error('Amount Paid must be > 0 and < Total for "Partially Paid"')
+      return false
+    }
+    return true
+  }
+
   async function handleSave() {
-    if (lineItems.length === 0) return
+    if (!validate()) return
     setSaving(true)
 
-    // 1. Insert invoice (omit invoice_number — DB trigger sets it)
     const invoiceRow = {
       customer_name: customerName.trim() || null,
       customer_contact: customerContact.trim() || null,
@@ -205,6 +219,11 @@ export default function NewInvoice() {
       total,
       payment_method: paymentMethod || null,
       shipping_option: shippingOption || null,
+      payment_status: paymentStatus,
+      amount_paid: paidNum,
+      is_preorder: isPreorder,
+      expected_arrival_date: isPreorder && expectedArrivalDate ? expectedArrivalDate : null,
+      fulfillment_status: isPreorder ? fulfillmentStatus : null,
       status: 'active',
       notes: notes.trim() || null,
       created_by: user?.email || null,
@@ -223,7 +242,6 @@ export default function NewInvoice() {
       return
     }
 
-    // 2. Insert line items
     const items = lineItems.map((li) => ({
       invoice_id: invoice.id,
       product_id: li.product_id,
@@ -237,7 +255,6 @@ export default function NewInvoice() {
     const { error: itemsErr } = await supabase.from('invoice_items').insert(items)
 
     if (itemsErr) {
-      // Manual rollback — delete the invoice row
       await supabase.from('invoices').delete().eq('id', invoice.id)
       toast.error('Failed to save line items — invoice rolled back')
       console.error(itemsErr)
@@ -390,23 +407,11 @@ export default function NewInvoice() {
               <h3 className="font-semibold text-gray-800">Customer Info</h3>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Customer Name</label>
-                <input
-                  type="text"
-                  placeholder="Optional"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  className={inputClass}
-                />
+                <input type="text" placeholder="Optional" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className={inputClass} />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Contact (phone / email)</label>
-                <input
-                  type="text"
-                  placeholder="Optional"
-                  value={customerContact}
-                  onChange={(e) => setCustomerContact(e.target.value)}
-                  className={inputClass}
-                />
+                <input type="text" placeholder="Optional" value={customerContact} onChange={(e) => setCustomerContact(e.target.value)} className={inputClass} />
               </div>
             </div>
 
@@ -415,11 +420,7 @@ export default function NewInvoice() {
               <h3 className="font-semibold text-gray-800">Payment</h3>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Payment Method</label>
-                <select
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value)}
-                  className={inputClass}
-                >
+                <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className={inputClass}>
                   <option value="">Select...</option>
                   <option value="Cash">Cash</option>
                   <option value="GCash">GCash</option>
@@ -432,16 +433,39 @@ export default function NewInvoice() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Shipping Option</label>
-                <select
-                  value={shippingOption}
-                  onChange={(e) => setShippingOption(e.target.value)}
-                  className={inputClass}
-                >
+                <select value={shippingOption} onChange={(e) => setShippingOption(e.target.value)} className={inputClass}>
                   <option value="">Select...</option>
                   <option value="J&T">J&T</option>
                   <option value="Lalamove">Lalamove</option>
                   <option value="LBC">LBC</option>
                 </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Payment Status</label>
+                <select value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)} className={inputClass}>
+                  <option value="Unpaid">Unpaid</option>
+                  <option value="Partially Paid">Partially Paid</option>
+                  <option value="Paid">Paid</option>
+                  <option value="Refunded">Refunded</option>
+                  <option value="Cancelled">Cancelled</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Amount Paid (₱)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={amountPaid}
+                  onChange={(e) => setAmountPaid(e.target.value)}
+                  className={inputClass}
+                />
+                {total > 0 && (
+                  <p className="text-xs mt-1 font-medium text-gray-500">
+                    Balance Due: <span className={balanceDue > 0 ? 'text-red-500' : 'text-green-600'}>{formatCurrency(balanceDue)}</span>
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Discount</label>
@@ -480,6 +504,42 @@ export default function NewInvoice() {
               </div>
             </div>
 
+            {/* Pre-order section */}
+            <div className="bg-white rounded-xl shadow-sm border border-[#EDE9FE] p-5 space-y-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isPreorder}
+                  onChange={(e) => setIsPreorder(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-300 text-[#7C3AED] focus:ring-[#7C3AED]"
+                />
+                <span className="text-sm font-semibold text-gray-800">This is a Pre-order</span>
+              </label>
+              {isPreorder && (
+                <>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Expected Arrival Date</label>
+                    <input
+                      type="date"
+                      value={expectedArrivalDate}
+                      onChange={(e) => setExpectedArrivalDate(e.target.value)}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Fulfillment Status</label>
+                    <select value={fulfillmentStatus} onChange={(e) => setFulfillmentStatus(e.target.value)} className={inputClass}>
+                      <option value="Pending">Pending</option>
+                      <option value="Ready">Ready</option>
+                      <option value="Shipped">Shipped</option>
+                      <option value="Delivered">Delivered</option>
+                      <option value="Cancelled">Cancelled</option>
+                    </select>
+                  </div>
+                </>
+              )}
+            </div>
+
             {/* Summary card */}
             <div className="bg-[#F5F3FF] rounded-xl border border-[#EDE9FE] p-5 space-y-3">
               <h3 className="font-semibold text-[#7C3AED]">Summary</h3>
@@ -490,10 +550,7 @@ export default function NewInvoice() {
               {discountAmount > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">
-                    Discount
-                    {discountType === 'percent' && discountValue
-                      ? ` (${discountValue}%)`
-                      : ''}
+                    Discount{discountType === 'percent' && discountValue ? ` (${discountValue}%)` : ''}
                   </span>
                   <span className="font-medium text-red-500">-{formatCurrency(discountAmount)}</span>
                 </div>
@@ -502,6 +559,18 @@ export default function NewInvoice() {
                 <span className="font-semibold text-[#7C3AED]">Total</span>
                 <span className="text-xl font-bold text-[#7C3AED]">{formatCurrency(total)}</span>
               </div>
+              {paidNum > 0 && (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Amount Paid</span>
+                    <span className="font-medium text-green-600">{formatCurrency(paidNum)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Balance Due</span>
+                    <span className={`font-medium ${balanceDue > 0 ? 'text-red-500' : 'text-green-600'}`}>{formatCurrency(balanceDue)}</span>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Save button */}
@@ -526,7 +595,6 @@ export default function NewInvoice() {
         </div>
       </div>
 
-      {/* Product picker modal */}
       {pickerOpen && (
         <ProductPicker
           products={products}

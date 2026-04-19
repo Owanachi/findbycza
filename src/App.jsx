@@ -343,6 +343,7 @@ function AppShell() {
     const detailMatch = hash.match(/^invoices\/(.+)$/)
     if (detailMatch) return { page: 'invoices/detail', invoiceId: detailMatch[1] }
     if (hash === 'invoices') return { page: 'invoices' }
+    if (hash === 'preorders') return { page: 'preorders' }
     return { page: 'inventory' }
   }, [])
 
@@ -395,6 +396,15 @@ function AppShell() {
       <div className="min-h-screen bg-white">
         <Header page="invoices" onNavigate={handleNavigate} />
         <Invoices onNavigate={handleNavigate} />
+      </div>
+    )
+  }
+
+  if (page === 'preorders') {
+    return (
+      <div className="min-h-screen bg-white">
+        <Header page="preorders" onNavigate={handleNavigate} />
+        <Invoices onNavigate={handleNavigate} preorderOnly />
       </div>
     )
   }

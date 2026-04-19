@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
-import { ArrowLeft, Printer, XCircle, AlertTriangle, Loader2 } from 'lucide-react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { ArrowLeft, Printer, XCircle, AlertTriangle, Loader2, Search, Package, Truck, CheckCircle2, X } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
@@ -16,13 +16,22 @@ function formatDate(dateStr) {
   })
 }
 
+function formatDateShort(dateStr) {
+  if (!dateStr) return '—'
+  const d = new Date(dateStr)
+  return d.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })
+}
+
 function formatCurrency(amount) {
   return `₱${Number(amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
-function capitalize(str) {
-  if (!str) return '—'
-  return str.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+const paymentStatusStyles = {
+  Unpaid: { bg: 'bg-red-100 text-red-700', stamp: 'text-red-500/20' },
+  'Partially Paid': { bg: 'bg-yellow-100 text-yellow-700', stamp: 'text-yellow-500/20' },
+  Paid: { bg: 'bg-green-100 text-green-700', stamp: 'text-green-500/20' },
+  Refunded: { bg: 'bg-gray-100 text-gray-600', stamp: 'text-gray-400/20' },
+  Cancelled: { bg: 'bg-gray-200 text-gray-700', stamp: 'text-gray-500/20' },
 }
 
 // ─── Void Confirmation Modal ─────────────────────────────────────────
@@ -30,28 +39,21 @@ function VoidModal({ onConfirm, onClose, voiding }) {
   const [reason, setReason] = useState('')
 
   useEffect(() => {
-    function onKey(e) {
-      if (e.key === 'Escape') onClose()
-    }
+    function onKey(e) { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 print:hidden" onClick={onClose}>
-      <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-3 mb-4">
           <div className="p-2 rounded-full bg-red-100">
             <AlertTriangle size={22} className="text-red-600" />
           </div>
           <h3 className="font-semibold text-gray-900 text-lg">Void this invoice?</h3>
         </div>
-        <p className="text-sm text-gray-600 mb-4">
-          Stock will be restored for all items. This cannot be undone.
-        </p>
+        <p className="text-sm text-gray-600 mb-4">Stock will be restored for all items. This cannot be undone.</p>
         <div className="mb-5">
           <label className="block text-xs font-medium text-gray-500 mb-1">Reason (optional)</label>
           <textarea
@@ -63,11 +65,7 @@ function VoidModal({ onConfirm, onClose, voiding }) {
           />
         </div>
         <div className="flex gap-3 justify-end">
-          <button
-            onClick={onClose}
-            disabled={voiding}
-            className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors"
-          >
+          <button onClick={onClose} disabled={voiding} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors">
             Cancel
           </button>
           <button
@@ -75,18 +73,112 @@ function VoidModal({ onConfirm, onClose, voiding }) {
             disabled={voiding}
             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50"
           >
-            {voiding ? (
-              <>
-                <Loader2 size={16} className="animate-spin" />
-                Voiding...
-              </>
-            ) : (
-              <>
-                <XCircle size={16} />
-                Void Invoice
-              </>
-            )}
+            {voiding ? <><Loader2 size={16} className="animate-spin" /> Voiding...</> : <><XCircle size={16} /> Void Invoice</>}
           </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Link Product Modal (Pre-order arrival) ──────────────────────────
+function LinkProductModal({ invoice, onClose, onLinked }) {
+  const [products, setProducts] = useState([])
+  const [search, setSearch] = useState('')
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function load() {
+      const { data } = await supabase.from('products').select('*').order('name')
+      if (data) setProducts(data)
+      setLoading(false)
+    }
+    load()
+  }, [])
+
+  useEffect(() => {
+    function onKey(e) { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase()
+    return products.filter((p) =>
+      p.name.toLowerCase().includes(q) || (p.category && p.category.toLowerCase().includes(q))
+    )
+  }, [products, search])
+
+  async function handleSelect(product) {
+    // Update fulfillment to Ready
+    const { error } = await supabase
+      .from('invoices')
+      .update({ fulfillment_status: 'Ready', linked_product_id: product.id })
+      .eq('id', invoice.id)
+    if (error) {
+      toast.error('Failed to link product')
+      console.error(error)
+      return
+    }
+    toast.success(`Linked to "${product.name}" — marked as Ready`)
+    onLinked()
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 print:hidden" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#EDE9FE]">
+          <h3 className="font-semibold text-[#7C3AED] text-lg">Mark as Arrived &amp; Link to Product</h3>
+          <button onClick={onClose} className="p-1 hover:bg-[#EDE9FE] rounded-lg transition-colors">
+            <X size={20} className="text-gray-400" />
+          </button>
+        </div>
+        <div className="px-5 py-3 border-b border-[#EDE9FE]">
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7C3AED]" />
+            <input
+              type="text"
+              placeholder="Search existing products..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              autoFocus
+              className="w-full pl-9 pr-4 py-2 text-sm border-2 border-[#EDE9FE] rounded-xl focus:ring-4 focus:ring-[#EDE9FE] focus:border-[#7C3AED] outline-none transition-all"
+            />
+          </div>
+        </div>
+        <div className="overflow-y-auto flex-1 p-2">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 size={24} className="animate-spin text-[#7C3AED]" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Search size={28} className="text-gray-300 mb-2" />
+              <p className="text-sm text-gray-500">No matching products</p>
+            </div>
+          ) : (
+            filtered.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => handleSelect(p)}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#F5F3FF] transition-colors text-left"
+              >
+                <div className="w-10 h-10 rounded-lg bg-[#EDE9FE] flex items-center justify-center">
+                  {p.img && p.img.startsWith('http') ? (
+                    <img src={p.img} alt={p.name} className="w-10 h-10 rounded-lg object-cover" />
+                  ) : (
+                    <Package size={18} className="text-[#7C3AED]" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800 truncate">{p.name}</p>
+                  <p className="text-xs text-gray-500">{p.category || 'Uncategorized'}</p>
+                </div>
+                <p className="text-sm font-semibold text-[#7C3AED]">{p.qty} in stock</p>
+              </button>
+            ))
+          )}
         </div>
       </div>
     </div>
@@ -101,6 +193,8 @@ export default function InvoiceDetail({ invoiceId }) {
   const [notFound, setNotFound] = useState(false)
   const [voidModalOpen, setVoidModalOpen] = useState(false)
   const [voiding, setVoiding] = useState(false)
+  const [linkModalOpen, setLinkModalOpen] = useState(false)
+  const [updatingFulfillment, setUpdatingFulfillment] = useState(false)
 
   const fetchInvoice = useCallback(async () => {
     setLoading(true)
@@ -144,7 +238,20 @@ export default function InvoiceDetail({ invoiceId }) {
     setVoiding(false)
   }
 
-  // ── Loading ──
+  async function updateFulfillment(newStatus, extras = {}) {
+    setUpdatingFulfillment(true)
+    const updates = { fulfillment_status: newStatus, ...extras }
+    const { error } = await supabase.from('invoices').update(updates).eq('id', invoiceId)
+    if (error) {
+      toast.error(`Failed to update to ${newStatus}`)
+      console.error(error)
+    } else {
+      toast.success(`Marked as ${newStatus}`)
+      await fetchInvoice()
+    }
+    setUpdatingFulfillment(false)
+  }
+
   if (loading) {
     return (
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16 flex items-center justify-center">
@@ -153,7 +260,6 @@ export default function InvoiceDetail({ invoiceId }) {
     )
   }
 
-  // ── Not found ──
   if (notFound || !invoice) {
     return (
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
@@ -162,12 +268,8 @@ export default function InvoiceDetail({ invoiceId }) {
         </div>
         <h2 className="text-xl font-bold text-gray-800 mb-2">Invoice not found</h2>
         <p className="text-sm text-gray-500 mb-6">This invoice may have been deleted or the link is invalid.</p>
-        <a
-          href="#/invoices"
-          className="inline-flex items-center gap-2 text-[#7C3AED] hover:text-[#6D28D9] font-semibold text-sm"
-        >
-          <ArrowLeft size={16} />
-          Back to Invoices
+        <a href="#/invoices" className="inline-flex items-center gap-2 text-[#7C3AED] hover:text-[#6D28D9] font-semibold text-sm">
+          <ArrowLeft size={16} /> Back to Invoices
         </a>
       </main>
     )
@@ -175,6 +277,12 @@ export default function InvoiceDetail({ invoiceId }) {
 
   const items = invoice.invoice_items || []
   const isVoided = invoice.status === 'voided'
+  const payStatus = invoice.payment_status || 'Unpaid'
+  const pStyle = paymentStatusStyles[payStatus] || paymentStatusStyles.Unpaid
+  const amountPaid = Number(invoice.amount_paid || 0)
+  const balanceDue = Math.max(0, (invoice.total || 0) - amountPaid)
+  const isPreorder = invoice.is_preorder
+  const fulfillment = invoice.fulfillment_status || 'Pending'
 
   return (
     <>
@@ -185,28 +293,66 @@ export default function InvoiceDetail({ invoiceId }) {
             href="#/invoices"
             className="inline-flex items-center gap-1.5 text-[#7C3AED] hover:text-[#6D28D9] font-medium text-sm transition-colors"
           >
-            <ArrowLeft size={18} />
-            Back to Invoices
+            <ArrowLeft size={18} /> Back to Invoices
           </a>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => window.print()}
               className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-[#7C3AED] hover:bg-[#EDE9FE] border border-[#EDE9FE] rounded-lg transition-colors"
             >
-              <Printer size={16} />
-              Print
+              <Printer size={16} /> Print
             </button>
             {!isVoided && (
               <button
                 onClick={() => setVoidModalOpen(true)}
                 className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 border border-red-200 rounded-lg transition-colors"
               >
-                <XCircle size={16} />
-                Void Invoice
+                <XCircle size={16} /> Void Invoice
               </button>
             )}
           </div>
         </div>
+
+        {/* Pre-order workflow buttons */}
+        {isPreorder && !isVoided && (
+          <div className="flex flex-wrap items-center gap-2 mb-6 print:hidden">
+            {fulfillment === 'Pending' && (
+              <button
+                onClick={() => setLinkModalOpen(true)}
+                disabled={updatingFulfillment}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-[#7C3AED] hover:bg-[#6D28D9] rounded-lg transition-colors disabled:opacity-50"
+              >
+                <Package size={16} /> Mark as Arrived &amp; Link to Product
+              </button>
+            )}
+            {fulfillment === 'Ready' && (
+              <button
+                onClick={() => updateFulfillment('Shipped')}
+                disabled={updatingFulfillment}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {updatingFulfillment ? <Loader2 size={16} className="animate-spin" /> : <Truck size={16} />}
+                Mark as Shipped
+              </button>
+            )}
+            {fulfillment === 'Shipped' && (
+              <button
+                onClick={() => {
+                  const phNow = new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })
+                  updateFulfillment('Delivered', { delivered_at: new Date().toISOString() })
+                }}
+                disabled={updatingFulfillment}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {updatingFulfillment ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                Mark as Delivered
+              </button>
+            )}
+            <span className="text-xs text-gray-400 ml-2">
+              Fulfillment: <span className="font-semibold text-gray-600">{fulfillment}</span>
+            </span>
+          </div>
+        )}
 
         {/* ── Invoice card ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-[#EDE9FE] overflow-hidden relative print:shadow-none print:border-gray-200 print:rounded-none">
@@ -219,7 +365,38 @@ export default function InvoiceDetail({ invoiceId }) {
             </div>
           )}
 
+          {/* Payment status watermark (non-voided) */}
+          {!isVoided && payStatus !== 'Unpaid' && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+              <span className={`${pStyle.stamp} text-[100px] font-extrabold uppercase tracking-widest -rotate-30 select-none`}>
+                {payStatus}
+              </span>
+            </div>
+          )}
+
           <div className="relative z-20 p-6 sm:p-8">
+            {/* Pre-order banner */}
+            {isPreorder && (
+              <div className="mb-6 bg-purple-50 border border-purple-200 rounded-xl px-4 py-3 flex flex-wrap items-center gap-3">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-600 text-white text-xs font-bold rounded-full uppercase">
+                  <Package size={14} /> Pre-Order
+                </span>
+                {invoice.expected_arrival_date && (
+                  <span className="text-sm text-purple-700">
+                    Expected arrival: <span className="font-semibold">{formatDateShort(invoice.expected_arrival_date)}</span>
+                  </span>
+                )}
+                <span className="text-sm text-purple-700">
+                  Fulfillment: <span className="font-semibold">{fulfillment}</span>
+                </span>
+                {invoice.delivered_at && (
+                  <span className="text-sm text-green-700">
+                    Delivered: <span className="font-semibold">{formatDate(invoice.delivered_at)}</span>
+                  </span>
+                )}
+              </div>
+            )}
+
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8 pb-6 border-b border-[#EDE9FE] print:border-gray-200">
               <div className="flex items-center gap-3">
@@ -246,12 +423,8 @@ export default function InvoiceDetail({ invoiceId }) {
                 {(invoice.customer_name || invoice.customer_contact) && (
                   <>
                     <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Bill To</p>
-                    {invoice.customer_name && (
-                      <p className="text-sm font-semibold text-gray-800">{invoice.customer_name}</p>
-                    )}
-                    {invoice.customer_contact && (
-                      <p className="text-sm text-gray-500">{invoice.customer_contact}</p>
-                    )}
+                    {invoice.customer_name && <p className="text-sm font-semibold text-gray-800">{invoice.customer_name}</p>}
+                    {invoice.customer_contact && <p className="text-sm text-gray-500">{invoice.customer_contact}</p>}
                   </>
                 )}
               </div>
@@ -259,18 +432,18 @@ export default function InvoiceDetail({ invoiceId }) {
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-medium text-gray-400 uppercase">Status</span>
                   {isVoided ? (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">
-                      Voided
-                    </span>
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">Voided</span>
                   ) : (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">
-                      Active
-                    </span>
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">Active</span>
                   )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-gray-400 uppercase">Payment</span>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${pStyle.bg}`}>{payStatus}</span>
                 </div>
                 {invoice.payment_method && (
                   <p className="text-sm text-gray-500">
-                    <span className="text-xs font-medium text-gray-400 uppercase mr-1">Payment</span>
+                    <span className="text-xs font-medium text-gray-400 uppercase mr-1">Method</span>
                     {invoice.payment_method}
                   </p>
                 )}
@@ -304,9 +477,7 @@ export default function InvoiceDetail({ invoiceId }) {
                       <td className="px-4 py-3 text-gray-400">{idx + 1}</td>
                       <td className="px-4 py-3">
                         <p className="font-medium text-gray-800">{item.product_name}</p>
-                        {item.product_category && (
-                          <p className="text-xs text-gray-400">{item.product_category}</p>
-                        )}
+                        {item.product_category && <p className="text-xs text-gray-400">{item.product_category}</p>}
                       </td>
                       <td className="px-4 py-3 text-center text-gray-700">{item.qty}</td>
                       <td className="px-4 py-3 text-right text-gray-700">{formatCurrency(item.unit_price)}</td>
@@ -326,16 +497,21 @@ export default function InvoiceDetail({ invoiceId }) {
                 </div>
                 {invoice.discount > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">
-                      Discount
-                      {invoice.discount_type === 'percent' ? ' (%)' : ''}
-                    </span>
+                    <span className="text-gray-500">Discount</span>
                     <span className="font-medium text-red-500">-{formatCurrency(invoice.discount)}</span>
                   </div>
                 )}
                 <div className="border-t border-[#EDE9FE] print:border-gray-200 pt-2 flex justify-between">
                   <span className="font-semibold text-[#7C3AED] print:text-gray-900">Total</span>
                   <span className="text-xl font-bold text-[#7C3AED] print:text-gray-900">{formatCurrency(invoice.total)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Amount Paid</span>
+                  <span className="font-medium text-green-600">{formatCurrency(amountPaid)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500 font-semibold">Balance Due</span>
+                  <span className={`font-bold ${balanceDue > 0 ? 'text-red-500' : 'text-green-600'}`}>{formatCurrency(balanceDue)}</span>
                 </div>
               </div>
             </div>
@@ -369,13 +545,12 @@ export default function InvoiceDetail({ invoiceId }) {
         </div>
       </main>
 
-      {/* Void confirmation modal */}
+      {/* Modals */}
       {voidModalOpen && (
-        <VoidModal
-          voiding={voiding}
-          onConfirm={handleVoid}
-          onClose={() => setVoidModalOpen(false)}
-        />
+        <VoidModal voiding={voiding} onConfirm={handleVoid} onClose={() => setVoidModalOpen(false)} />
+      )}
+      {linkModalOpen && (
+        <LinkProductModal invoice={invoice} onClose={() => setLinkModalOpen(false)} onLinked={fetchInvoice} />
       )}
 
       {/* Print styles */}

@@ -1,4 +1,4 @@
-import { Plus, LogOut, Package, FileText } from 'lucide-react'
+import { Plus, LogOut, Package, FileText, PackageCheck } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 
 const LOGO_URL = 'https://iixivpuyrxeoapsouszx.supabase.co/storage/v1/object/public/product-images/Logo.jpg'
@@ -36,6 +36,10 @@ export default function Header({ onAdd, page, onNavigate }) {
                 <FileText size={16} />
                 Invoices
               </button>
+              <button onClick={() => onNavigate('preorders')} className={navLinkClass('preorders')}>
+                <PackageCheck size={16} />
+                Pre-orders
+              </button>
             </nav>
           </div>
           <div className="flex items-center gap-3">
@@ -69,6 +73,10 @@ export default function Header({ onAdd, page, onNavigate }) {
           <button onClick={() => onNavigate('invoices')} className={navLinkClass('invoices')}>
             <FileText size={16} />
             Invoices
+          </button>
+          <button onClick={() => onNavigate('preorders')} className={navLinkClass('preorders')}>
+            <PackageCheck size={16} />
+            Pre-orders
           </button>
         </div>
       </div>
