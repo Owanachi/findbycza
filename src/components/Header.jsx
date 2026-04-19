@@ -1,4 +1,4 @@
-import { Plus, LogOut, Package, FileText, PackageCheck, Upload } from 'lucide-react'
+import { Plus, LogOut, Package, FileText, PackageCheck, Upload, Tag } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 
 const LOGO_URL = 'https://iixivpuyrxeoapsouszx.supabase.co/storage/v1/object/public/product-images/Logo.jpg'
@@ -39,6 +39,10 @@ export default function Header({ onAdd, onBulkUpload, page, onNavigate }) {
               <button onClick={() => onNavigate('preorders')} className={navLinkClass('preorders')}>
                 <PackageCheck size={16} />
                 Pre-orders
+              </button>
+              <button onClick={() => onNavigate('layaways')} className={navLinkClass('layaways')}>
+                <Tag size={16} />
+                Layaways
               </button>
             </nav>
           </div>

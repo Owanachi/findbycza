@@ -403,6 +403,7 @@ function AppShell() {
     if (detailMatch) return { page: 'invoices/detail', invoiceId: detailMatch[1] }
     if (hash === 'invoices') return { page: 'invoices' }
     if (hash === 'preorders') return { page: 'preorders' }
+    if (hash === 'layaways') return { page: 'layaways' }
     return { page: 'inventory' }
   }, [])
 
@@ -431,6 +432,7 @@ function AppShell() {
   if (pg === 'invoices/detail') return <div className="min-h-screen bg-white"><Header page="invoices" onNavigate={handleNavigate} /><InvoiceDetail invoiceId={route.invoiceId} /></div>
   if (pg === 'invoices') return <div className="min-h-screen bg-white"><Header page="invoices" onNavigate={handleNavigate} /><Invoices onNavigate={handleNavigate} /></div>
   if (pg === 'preorders') return <div className="min-h-screen bg-white"><Header page="preorders" onNavigate={handleNavigate} /><Invoices onNavigate={handleNavigate} preorderOnly /></div>
+  if (pg === 'layaways') return <div className="min-h-screen bg-white"><Header page="layaways" onNavigate={handleNavigate} /><Invoices onNavigate={handleNavigate} layawayOnly /></div>
 
   return <Inventory page={pg} onNavigate={handleNavigate} />
 }

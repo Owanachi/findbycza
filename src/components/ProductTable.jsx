@@ -2,12 +2,12 @@ import { useState, useEffect, useCallback } from 'react'
 import { Pencil, Trash2, ChevronUp, ChevronDown, Loader2, X, Eye, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Camera } from 'lucide-react'
 
 const columns = [
-  { key: 'name', label: 'Product', sortable: true, width: 'min-w-[260px] w-[30%]' },
-  { key: 'category', label: 'Category', sortable: true, width: 'min-w-[120px] w-[13%]' },
-  { key: 'sub_category', label: 'Sub-Category', sortable: true, width: 'min-w-[120px] w-[13%]' },
-  { key: 'price', label: 'Price', sortable: true, width: 'min-w-[100px] w-[10%]' },
-  { key: 'rs_price', label: 'RS Price', sortable: true, width: 'min-w-[100px] w-[10%]' },
-  { key: 'qty', label: 'Quantity', sortable: true, width: 'min-w-[90px] w-[8%]' },
+  { key: 'name', label: 'Product', sortable: true, width: 'min-w-[240px] w-[26%]' },
+  { key: 'category', label: 'Category', sortable: true, width: 'min-w-[110px] w-[12%]' },
+  { key: 'sub_category', label: 'Sub-Cat', sortable: true, width: 'min-w-[100px] w-[10%]' },
+  { key: 'price', label: 'Price', sortable: true, width: 'min-w-[90px] w-[9%]' },
+  { key: 'rs_price', label: 'RS Price', sortable: true, width: 'min-w-[90px] w-[9%]' },
+  { key: 'qty', label: 'Avail / Rsv / Total', sortable: true, width: 'min-w-[130px] w-[12%]' },
   { key: 'status', label: 'Status', sortable: false, width: 'min-w-[110px] w-[10%]' },
 ]
 
@@ -276,6 +276,11 @@ function DetailModal({ product, onClose, onEdit, onDelete }) {
             <div className="bg-gray-50 rounded-xl p-3">
               <div className="text-[11px] uppercase tracking-wider text-gray-400 font-medium">Quantity</div>
               <div className="text-lg font-semibold text-gray-900 mt-0.5">{p.qty}</div>
+              {(p.reserved_qty || 0) > 0 && (
+                <div className="text-xs text-amber-600 mt-0.5">
+                  {p.reserved_qty} reserved &middot; {p.qty - p.reserved_qty} available
+                </div>
+              )}
             </div>
             <div className="bg-gray-50 rounded-xl p-3">
               <div className="text-[11px] uppercase tracking-wider text-gray-400 font-medium">Status</div>
@@ -440,7 +445,7 @@ function ProductCard({ product, onView, onEdit, onDelete }) {
       </div>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-600">Qty: <span className="font-medium">{p.qty}</span></span>
+          <span className="text-sm text-gray-600">Qty: <span className="font-medium">{p.qty}</span>{(p.reserved_qty || 0) > 0 && <span className="text-xs text-amber-600 ml-1">({p.reserved_qty} rsv)</span>}</span>
           <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${badgeClass}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${dotClass}`} />
             {badgeLabel}
@@ -554,7 +559,19 @@ export default function ProductTable({ products, loading, onEdit, onDelete, sort
                   <td className="px-4 py-4 font-medium text-gray-500">
                     {p.rs_price != null ? `₱${Number(p.rs_price).toFixed(2)}` : '—'}
                   </td>
-                  <td className="px-4 py-4 font-medium text-gray-900">{p.qty}</td>
+                  <td className="px-4 py-4 font-medium text-gray-900">
+                    {(p.reserved_qty || 0) > 0 ? (
+                      <span className="text-xs">
+                        <span className="text-green-600">{p.qty - (p.reserved_qty || 0)}</span>
+                        <span className="text-gray-400"> / </span>
+                        <span className="text-amber-600">{p.reserved_qty}</span>
+                        <span className="text-gray-400"> / </span>
+                        <span>{p.qty}</span>
+                      </span>
+                    ) : (
+                      p.qty
+                    )}
+                  </td>
                   <td className="px-4 py-4">
                     <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${badgeClass}`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${dotClass}`} />

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { ArrowLeft, Printer, XCircle, AlertTriangle, Loader2, Search, Package, Truck, CheckCircle2, X, Edit3, Plus, Trash2, Save, DollarSign, Percent } from 'lucide-react'
+import { ArrowLeft, Printer, XCircle, AlertTriangle, Loader2, Search, Package, Truck, CheckCircle2, X, Edit3, Plus, Trash2, Save, DollarSign, Percent, Tag } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
@@ -187,7 +187,7 @@ function LinkProductModal({ invoice, onClose, onLinked }) {
 }
 
 // ─── Record Payment Modal ───────────────────────────────────────────
-function RecordPaymentModal({ invoice, onClose, onSaved, userEmail }) {
+function RecordPaymentModal({ invoice, onClose, onSaved, onLayawayFullyPaid, userEmail }) {
   const [amount, setAmount] = useState('')
   const [method, setMethod] = useState('Cash')
   const [paymentDate, setPaymentDate] = useState(() => {
@@ -251,8 +251,15 @@ function RecordPaymentModal({ invoice, onClose, onSaved, userEmail }) {
     }).eq('id', invoice.id)
 
     toast.success('Payment recorded')
-    onSaved()
-    onClose()
+
+    // If layaway is now fully paid, trigger completion prompt
+    if (invoice.is_layaway && invoice.layaway_status === 'Active' && totalPaid >= invoiceTotal && onLayawayFullyPaid) {
+      onClose()
+      onLayawayFullyPaid()
+    } else {
+      onSaved()
+      onClose()
+    }
     setSaving(false)
   }
 
@@ -317,6 +324,10 @@ function EditInvoiceModal({ invoice, onClose, onSaved, userEmail }) {
   const [isPreorder, setIsPreorder] = useState(invoice.is_preorder || false)
   const [expectedArrivalDate, setExpectedArrivalDate] = useState(invoice.expected_arrival_date || '')
   const [fulfillmentStatus, setFulfillmentStatus] = useState(invoice.fulfillment_status || 'Pending')
+  const [isLayaway, setIsLayaway] = useState(invoice.is_layaway || false)
+  const [layawayDepositAmount, setLayawayDepositAmount] = useState(String(invoice.layaway_deposit_amount || ''))
+  const [layawayDueDate, setLayawayDueDate] = useState(invoice.layaway_due_date || '')
+  const [layawayStatus, setLayawayStatus] = useState(invoice.layaway_status || 'Active')
   const [lineItems, setLineItems] = useState((invoice.invoice_items || []).map((it) => ({
     id: it.id,
     product_id: it.product_id,
@@ -435,9 +446,13 @@ function EditInvoiceModal({ invoice, onClose, onSaved, userEmail }) {
       shipping_option: shippingOption || null,
       payment_status: paymentStatus,
       amount_paid: paidNum,
-      is_preorder: isPreorder,
-      expected_arrival_date: isPreorder && expectedArrivalDate ? expectedArrivalDate : null,
-      fulfillment_status: isPreorder ? fulfillmentStatus : null,
+      is_preorder: isPreorder && !isLayaway,
+      expected_arrival_date: isPreorder && !isLayaway && expectedArrivalDate ? expectedArrivalDate : null,
+      fulfillment_status: isPreorder && !isLayaway ? fulfillmentStatus : null,
+      is_layaway: isLayaway,
+      layaway_deposit_amount: isLayaway ? (Number(layawayDepositAmount) || null) : null,
+      layaway_due_date: isLayaway ? layawayDueDate || null : null,
+      layaway_status: isLayaway ? layawayStatus : null,
       notes: notes.trim() || null,
       updated_by: userEmail || null,
       ...fulfillmentUpdates,
@@ -551,8 +566,8 @@ function EditInvoiceModal({ invoice, onClose, onSaved, userEmail }) {
             {/* Pre-order */}
             <div className="pt-2">
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={isPreorder} onChange={(e) => setIsPreorder(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-[#7C3AED] focus:ring-[#7C3AED]" />
-                <span className="text-sm font-semibold text-gray-800">Pre-order</span>
+                <input type="checkbox" checked={isPreorder} onChange={(e) => { setIsPreorder(e.target.checked); if (e.target.checked) setIsLayaway(false) }} disabled={isLayaway} className="w-4 h-4 rounded border-gray-300 text-[#7C3AED] focus:ring-[#7C3AED] disabled:opacity-50" />
+                <span className={`text-sm font-semibold ${isLayaway ? 'text-gray-400' : 'text-gray-800'}`}>Pre-order</span>
               </label>
               {isPreorder && (
                 <div className="mt-3 space-y-3">
@@ -568,6 +583,35 @@ function EditInvoiceModal({ invoice, onClose, onSaved, userEmail }) {
                       <option value="Shipped">Shipped</option>
                       <option value="Delivered">Delivered</option>
                       <option value="Cancelled">Cancelled</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Layaway */}
+            <div className="pt-2 border-t border-gray-100">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={isLayaway} onChange={(e) => { setIsLayaway(e.target.checked); if (e.target.checked) setIsPreorder(false) }} disabled={isPreorder} className="w-4 h-4 rounded border-gray-300 text-[#7C3AED] focus:ring-[#7C3AED] disabled:opacity-50" />
+                <span className={`text-sm font-semibold ${isPreorder ? 'text-gray-400' : 'text-gray-800'}`}>Layaway</span>
+              </label>
+              {isLayaway && (
+                <div className="mt-3 space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Minimum Deposit (₱)</label>
+                    <input type="number" min="0" step="0.01" placeholder="30% of total" value={layawayDepositAmount} onChange={(e) => setLayawayDepositAmount(e.target.value)} className={inputClass} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Due Date</label>
+                    <input type="date" value={layawayDueDate} onChange={(e) => setLayawayDueDate(e.target.value)} className={inputClass} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Layaway Status</label>
+                    <select value={layawayStatus} onChange={(e) => setLayawayStatus(e.target.value)} className={inputClass}>
+                      <option value="Active">Active</option>
+                      <option value="Completed">Completed</option>
+                      <option value="Cancelled">Cancelled</option>
+                      <option value="Defaulted">Defaulted</option>
                     </select>
                   </div>
                 </div>
@@ -840,6 +884,57 @@ export default function InvoiceDetail({ invoiceId, autoEdit }) {
   const isPreorder = invoice.is_preorder
   const fulfillment = invoice.fulfillment_status || 'Pending'
   const totalPayments = payments.reduce((sum, p) => sum + Number(p.amount), 0)
+  const isLayaway = invoice.is_layaway
+  const layawayStatus = invoice.layaway_status || 'Active'
+  const [completeModalOpen, setCompleteModalOpen] = useState(false)
+  const [completing, setCompleting] = useState(false)
+
+  async function handleLayawayComplete() {
+    setCompleting(true)
+    // Update layaway status
+    await supabase.from('invoices').update({
+      layaway_status: 'Completed',
+      updated_by: user?.email || null,
+    }).eq('id', invoiceId)
+
+    // Release reservation and decrement stock for each line item
+    const items = invoice.invoice_items || []
+    for (const item of items) {
+      const { data: prod } = await supabase.from('products').select('qty, reserved_qty').eq('id', item.product_id).single()
+      if (prod) {
+        await supabase.from('products').update({
+          qty: Math.max(0, (prod.qty || 0) - item.qty),
+          reserved_qty: Math.max(0, (prod.reserved_qty || 0) - item.qty),
+        }).eq('id', item.product_id)
+      }
+    }
+
+    toast.success('Layaway completed — inventory released')
+    setCompleteModalOpen(false)
+    setCompleting(false)
+    await fetchInvoice()
+  }
+
+  async function handleLayawayCancel(newStatus) {
+    // Release reservation only (no stock decrement)
+    const items = invoice.invoice_items || []
+    for (const item of items) {
+      const { data: prod } = await supabase.from('products').select('reserved_qty').eq('id', item.product_id).single()
+      if (prod) {
+        await supabase.from('products').update({
+          reserved_qty: Math.max(0, (prod.reserved_qty || 0) - item.qty),
+        }).eq('id', item.product_id)
+      }
+    }
+
+    await supabase.from('invoices').update({
+      layaway_status: newStatus,
+      updated_by: user?.email || null,
+    }).eq('id', invoiceId)
+
+    toast.success(`Layaway ${newStatus.toLowerCase()} — reservation released`)
+    await fetchInvoice()
+  }
 
   return (
     <>
@@ -970,6 +1065,40 @@ export default function InvoiceDetail({ invoiceId, autoEdit }) {
                     Delivered: <span className="font-semibold">{formatDate(invoice.delivered_at)}</span>
                   </span>
                 )}
+              </div>
+            )}
+
+            {/* Layaway banner */}
+            {isLayaway && (
+              <div className="mb-6 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3 flex flex-wrap items-center gap-3">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-600 text-white text-xs font-bold rounded-full uppercase">
+                  <Tag size={14} /> Layaway
+                </span>
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                  layawayStatus === 'Active' ? 'bg-blue-100 text-blue-700' :
+                  layawayStatus === 'Completed' ? 'bg-green-100 text-green-700' :
+                  layawayStatus === 'Cancelled' ? 'bg-gray-200 text-gray-700' :
+                  'bg-red-100 text-red-700'
+                }`}>
+                  {layawayStatus}
+                </span>
+                {invoice.layaway_deposit_amount && (
+                  <span className="text-sm text-indigo-700">
+                    Deposit: <span className="font-semibold">{formatCurrency(invoice.layaway_deposit_amount)}</span>
+                  </span>
+                )}
+                {invoice.layaway_due_date && (
+                  <span className="text-sm text-indigo-700">
+                    Due: <span className="font-semibold">{formatDateShort(invoice.layaway_due_date)}</span>
+                  </span>
+                )}
+                {(() => {
+                  if (!invoice.layaway_due_date || layawayStatus !== 'Active') return null
+                  const daysLeft = Math.ceil((new Date(invoice.layaway_due_date) - new Date()) / (1000 * 60 * 60 * 24))
+                  if (daysLeft < 0 && balanceDue > 0) return <span className="text-xs font-bold text-red-600">OVERDUE</span>
+                  if (daysLeft >= 0) return <span className="text-xs text-indigo-500">{daysLeft} day{daysLeft === 1 ? '' : 's'} left</span>
+                  return null
+                })()}
               </div>
             )}
 
@@ -1130,6 +1259,20 @@ export default function InvoiceDetail({ invoiceId, autoEdit }) {
               </div>
             )}
 
+            {/* Layaway terms (print) */}
+            {isLayaway && (
+              <div className="mb-8 p-4 bg-indigo-50/50 rounded-xl border border-indigo-100 print:bg-gray-50 print:rounded-none print:border-gray-200">
+                <p className="text-xs font-medium text-indigo-600 uppercase mb-2">Layaway Terms</p>
+                <div className="text-xs text-gray-600 space-y-1 whitespace-pre-wrap">
+                  <p>- Minimum deposit: 30% due at reservation</p>
+                  <p>- Full payment due by: {invoice.layaway_due_date ? formatDateShort(invoice.layaway_due_date) : 'N/A'}</p>
+                  <p>- Items held in store, not released until fully paid</p>
+                  <p>- Cancellation: 80% refund of amount paid, 20% admin fee</p>
+                  <p>- Default: 50% deposit forfeit after 2 missed payments</p>
+                </div>
+              </div>
+            )}
+
             {/* Footer */}
             <div className="border-t border-[#EDE9FE] print:border-gray-200 pt-6 text-center">
               <p className="text-sm font-medium text-[#7C3AED] print:text-gray-700">
@@ -1163,8 +1306,30 @@ export default function InvoiceDetail({ invoiceId, autoEdit }) {
           invoice={invoice}
           onClose={() => setPaymentModalOpen(false)}
           onSaved={() => { fetchInvoice(); fetchPayments() }}
+          onLayawayFullyPaid={() => { fetchInvoice(); fetchPayments(); setCompleteModalOpen(true) }}
           userEmail={user?.email}
         />
+      )}
+      {completeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 print:hidden" onClick={() => setCompleteModalOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-full bg-green-100">
+                <CheckCircle2 size={22} className="text-green-600" />
+              </div>
+              <h3 className="font-semibold text-gray-900 text-lg">Layaway Fully Paid</h3>
+            </div>
+            <p className="text-sm text-gray-600 mb-5">This layaway is fully paid. Mark as Completed and release inventory?</p>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => setCompleteModalOpen(false)} disabled={completing} className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors">
+                Not Yet
+              </button>
+              <button onClick={handleLayawayComplete} disabled={completing} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors disabled:opacity-50">
+                {completing ? <><Loader2 size={16} className="animate-spin" /> Completing...</> : <><CheckCircle2 size={16} /> Yes, Complete</>}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Print styles */}

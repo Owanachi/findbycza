@@ -3,7 +3,12 @@
     "allow": [
       "Bash(gh pr:*)",
       "Bash(git diff:*)",
-      "Bash(diffstat)"
+      "Bash(diffstat)",
+      "Bash(npm uninstall:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git add:*)",
+      "Bash(ls -la /e/Inventra/*.sql)"
     ]
   }
 }

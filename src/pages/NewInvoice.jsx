@@ -121,6 +121,14 @@ export default function NewInvoice() {
   const [isPreorder, setIsPreorder] = useState(false)
   const [expectedArrivalDate, setExpectedArrivalDate] = useState('')
   const [fulfillmentStatus, setFulfillmentStatus] = useState('Pending')
+  const [isLayaway, setIsLayaway] = useState(false)
+  const [layawayDepositAmount, setLayawayDepositAmount] = useState('')
+  const [layawayDueDate, setLayawayDueDate] = useState(() => {
+    const d = new Date()
+    d.setDate(d.getDate() + 60)
+    return d.toISOString().slice(0, 10)
+  })
+  const [layawayStatus, setLayawayStatus] = useState('Active')
   const [discountValue, setDiscountValue] = useState('')
   const [discountType, setDiscountType] = useState('amount')
   const [notes, setNotes] = useState('')
@@ -190,11 +198,22 @@ export default function NewInvoice() {
   const paidNum = Number(amountPaid) || 0
   const balanceDue = Math.max(0, total - paidNum)
 
+  // Auto-calc layaway deposit default (30% of total)
+  const layawayDepositDefault = Math.round(total * 0.3 * 100) / 100
+
   // Validation
   function validate() {
     if (lineItems.length === 0) {
       toast.error('Add at least one product')
       return false
+    }
+    if (isLayaway) {
+      const deposit = Number(layawayDepositAmount) || layawayDepositDefault
+      if (paidNum < deposit) {
+        toast.error(`Amount Paid must be at least the deposit (${formatCurrency(deposit)})`)
+        return false
+      }
+      return true
     }
     if (paymentStatus === 'Paid' && paidNum !== total) {
       toast.error('Amount Paid must equal Total when status is "Paid"')
@@ -211,6 +230,14 @@ export default function NewInvoice() {
     if (!validate()) return
     setSaving(true)
 
+    // For layaway, auto-calculate payment status
+    let finalPaymentStatus = paymentStatus
+    if (isLayaway) {
+      if (paidNum >= total) finalPaymentStatus = 'Paid'
+      else if (paidNum > 0) finalPaymentStatus = 'Partially Paid'
+      else finalPaymentStatus = 'Unpaid'
+    }
+
     const invoiceRow = {
       customer_name: customerName.trim() || null,
       customer_contact: customerContact.trim() || null,
@@ -219,11 +246,15 @@ export default function NewInvoice() {
       total,
       payment_method: paymentMethod || null,
       shipping_option: shippingOption || null,
-      payment_status: paymentStatus,
+      payment_status: finalPaymentStatus,
       amount_paid: paidNum,
-      is_preorder: isPreorder,
-      expected_arrival_date: isPreorder && expectedArrivalDate ? expectedArrivalDate : null,
-      fulfillment_status: isPreorder ? fulfillmentStatus : null,
+      is_preorder: isPreorder && !isLayaway,
+      expected_arrival_date: isPreorder && !isLayaway && expectedArrivalDate ? expectedArrivalDate : null,
+      fulfillment_status: isPreorder && !isLayaway ? fulfillmentStatus : null,
+      is_layaway: isLayaway,
+      layaway_deposit_amount: isLayaway ? (Number(layawayDepositAmount) || layawayDepositDefault) : null,
+      layaway_due_date: isLayaway ? layawayDueDate : null,
+      layaway_status: isLayaway ? layawayStatus : null,
       status: 'active',
       notes: notes.trim() || null,
       created_by: user?.email || null,
@@ -260,6 +291,18 @@ export default function NewInvoice() {
       console.error(itemsErr)
       setSaving(false)
       return
+    }
+
+    // Reserve inventory for layaway
+    if (isLayaway && layawayStatus === 'Active') {
+      for (const li of lineItems) {
+        await supabase.rpc('increment_reserved_qty', { product_id_arg: li.product_id, qty_arg: li.qty }).catch(() => {
+          // Fallback: direct update
+          supabase.from('products').select('reserved_qty').eq('id', li.product_id).single().then(({ data }) => {
+            if (data) supabase.from('products').update({ reserved_qty: (data.reserved_qty || 0) + li.qty }).eq('id', li.product_id)
+          })
+        })
+      }
     }
 
     toast.success('Invoice created!')
@@ -504,16 +547,17 @@ export default function NewInvoice() {
               </div>
             </div>
 
-            {/* Pre-order section */}
+            {/* Pre-order / Layaway section */}
             <div className="bg-white rounded-xl shadow-sm border border-[#EDE9FE] p-5 space-y-4">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={isPreorder}
-                  onChange={(e) => setIsPreorder(e.target.checked)}
-                  className="w-4 h-4 rounded border-gray-300 text-[#7C3AED] focus:ring-[#7C3AED]"
+                  onChange={(e) => { setIsPreorder(e.target.checked); if (e.target.checked) setIsLayaway(false) }}
+                  disabled={isLayaway}
+                  className="w-4 h-4 rounded border-gray-300 text-[#7C3AED] focus:ring-[#7C3AED] disabled:opacity-50"
                 />
-                <span className="text-sm font-semibold text-gray-800">This is a Pre-order</span>
+                <span className={`text-sm font-semibold ${isLayaway ? 'text-gray-400' : 'text-gray-800'}`}>This is a Pre-order</span>
               </label>
               {isPreorder && (
                 <>
@@ -538,6 +582,54 @@ export default function NewInvoice() {
                   </div>
                 </>
               )}
+
+              <div className="border-t border-[#EDE9FE] pt-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isLayaway}
+                    onChange={(e) => { setIsLayaway(e.target.checked); if (e.target.checked) setIsPreorder(false) }}
+                    disabled={isPreorder}
+                    className="w-4 h-4 rounded border-gray-300 text-[#7C3AED] focus:ring-[#7C3AED] disabled:opacity-50"
+                  />
+                  <span className={`text-sm font-semibold ${isPreorder ? 'text-gray-400' : 'text-gray-800'}`}>This is a Layaway</span>
+                </label>
+                {isLayaway && (
+                  <div className="mt-3 space-y-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Minimum Deposit (₱)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder={layawayDepositDefault.toFixed(2)}
+                        value={layawayDepositAmount}
+                        onChange={(e) => setLayawayDepositAmount(e.target.value)}
+                        className={inputClass}
+                      />
+                      <p className="text-[10px] text-gray-400 mt-0.5">Default: 30% of total ({formatCurrency(layawayDepositDefault)})</p>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Due Date</label>
+                      <input
+                        type="date"
+                        value={layawayDueDate}
+                        onChange={(e) => setLayawayDueDate(e.target.value)}
+                        className={inputClass}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Layaway Status</label>
+                      <select value={layawayStatus} onChange={(e) => setLayawayStatus(e.target.value)} className={inputClass}>
+                        <option value="Active">Active</option>
+                        <option value="Completed">Completed</option>
+                        <option value="Cancelled">Cancelled</option>
+                        <option value="Defaulted">Defaulted</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Summary card */}

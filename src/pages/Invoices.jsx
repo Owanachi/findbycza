@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Plus, Search, Eye, FileText, Loader2, Package, Pencil } from 'lucide-react'
+import { Plus, Search, Eye, FileText, Loader2, Package, Pencil, Tag, Clock, AlertCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
 function formatDate(dateStr) {
@@ -65,12 +65,25 @@ function FulfillmentBadge({ status }) {
   )
 }
 
-export default function Invoices({ onNavigate, preorderOnly: initialPreorderOnly }) {
+function LayawayDueIcon({ invoice }) {
+  if (!invoice.is_layaway || invoice.layaway_status !== 'Active') return null
+  const due = invoice.layaway_due_date ? new Date(invoice.layaway_due_date) : null
+  if (!due) return null
+  const now = new Date()
+  const daysLeft = Math.ceil((due - now) / (1000 * 60 * 60 * 24))
+  const balance = Math.max(0, (invoice.total || 0) - (invoice.amount_paid || 0))
+  if (daysLeft < 0 && balance > 0) return <span title="Overdue" className="text-red-500 text-xs font-bold flex items-center gap-0.5"><AlertCircle size={12} />Overdue</span>
+  if (daysLeft <= 7 && daysLeft >= 0) return <span title={`Due in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`} className="text-amber-500"><Clock size={14} /></span>
+  return null
+}
+
+export default function Invoices({ onNavigate, preorderOnly: initialPreorderOnly, layawayOnly: initialLayawayOnly }) {
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [paymentFilter, setPaymentFilter] = useState('All')
   const [preorderOnly, setPreorderOnly] = useState(initialPreorderOnly || false)
+  const [layawayOnly, setLayawayOnly] = useState(initialLayawayOnly || false)
   const [fulfillmentFilter, setFulfillmentFilter] = useState('All')
 
   useEffect(() => {
@@ -100,6 +113,26 @@ export default function Invoices({ onNavigate, preorderOnly: initialPreorderOnly
     return { count: preorders.length, totalBalance, byFulfillment }
   }, [invoices])
 
+  // Layaway summary
+  const layawaySummary = useMemo(() => {
+    const layaways = invoices.filter((inv) => inv.is_layaway)
+    const active = layaways.filter((inv) => inv.layaway_status === 'Active')
+    const totalBalance = active.reduce((sum, inv) => sum + Math.max(0, (inv.total || 0) - (inv.amount_paid || 0)), 0)
+    const now = new Date()
+    const dueThisWeek = active.filter((inv) => {
+      const due = inv.layaway_due_date ? new Date(inv.layaway_due_date) : null
+      if (!due) return false
+      const daysLeft = Math.ceil((due - now) / (1000 * 60 * 60 * 24))
+      return daysLeft >= 0 && daysLeft <= 7
+    }).length
+    const overdue = active.filter((inv) => {
+      const due = inv.layaway_due_date ? new Date(inv.layaway_due_date) : null
+      if (!due) return false
+      return due < now && Math.max(0, (inv.total || 0) - (inv.amount_paid || 0)) > 0
+    }).length
+    return { total: layaways.length, active: active.length, totalBalance, dueThisWeek, overdue }
+  }, [invoices])
+
   const filtered = useMemo(() => {
     return invoices.filter((inv) => {
       if (search) {
@@ -112,9 +145,10 @@ export default function Invoices({ onNavigate, preorderOnly: initialPreorderOnly
       if (paymentFilter !== 'All' && (inv.payment_status || 'Unpaid') !== paymentFilter) return false
       if (preorderOnly && !inv.is_preorder) return false
       if (preorderOnly && fulfillmentFilter !== 'All' && (inv.fulfillment_status || 'Pending') !== fulfillmentFilter) return false
+      if (layawayOnly && !inv.is_layaway) return false
       return true
     })
-  }, [invoices, search, paymentFilter, preorderOnly, fulfillmentFilter])
+  }, [invoices, search, paymentFilter, preorderOnly, fulfillmentFilter, layawayOnly])
 
   const filterSelectClass = 'px-3 py-2 text-sm border border-[#EDE9FE] rounded-lg bg-white focus:ring-2 focus:ring-[#7C3AED] focus:border-[#7C3AED] outline-none'
 
@@ -124,10 +158,10 @@ export default function Invoices({ onNavigate, preorderOnly: initialPreorderOnly
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
           <h2 className="text-2xl font-bold text-[#7C3AED]">
-            {preorderOnly ? 'Pre-orders' : 'Invoices'}
+            {layawayOnly ? 'Layaways' : preorderOnly ? 'Pre-orders' : 'Invoices'}
           </h2>
           <p className="mt-1 text-sm text-gray-500">
-            {preorderOnly ? 'Track and manage pre-ordered items' : 'Manage and track all your invoices'}
+            {layawayOnly ? 'Track layaway reservations and payments' : preorderOnly ? 'Track and manage pre-ordered items' : 'Manage and track all your invoices'}
           </p>
         </div>
         <a
@@ -161,6 +195,34 @@ export default function Invoices({ onNavigate, preorderOnly: initialPreorderOnly
         </div>
       )}
 
+      {/* Layaway summary banner */}
+      {layawayOnly && layawaySummary.active > 0 && (
+        <div className="mb-6 bg-indigo-50 border border-indigo-200 rounded-xl p-4">
+          <div className="flex flex-wrap gap-6 text-sm">
+            <div>
+              <span className="text-gray-500">Active Layaways:</span>
+              <span className="ml-1 font-bold text-indigo-700">{layawaySummary.active}</span>
+            </div>
+            <div>
+              <span className="text-gray-500">Total Balance Due:</span>
+              <span className="ml-1 font-bold text-red-500">{formatCurrency(layawaySummary.totalBalance)}</span>
+            </div>
+            {layawaySummary.dueThisWeek > 0 && (
+              <div>
+                <span className="text-gray-500">Due This Week:</span>
+                <span className="ml-1 font-bold text-amber-600">{layawaySummary.dueThisWeek}</span>
+              </div>
+            )}
+            {layawaySummary.overdue > 0 && (
+              <div>
+                <span className="text-gray-500">Overdue:</span>
+                <span className="ml-1 font-bold text-red-600">{layawaySummary.overdue}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Search & filters */}
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <div className="relative max-w-xs flex-1 min-w-[200px]">
@@ -185,11 +247,21 @@ export default function Invoices({ onNavigate, preorderOnly: initialPreorderOnly
           <input
             type="checkbox"
             checked={preorderOnly}
-            onChange={(e) => setPreorderOnly(e.target.checked)}
+            onChange={(e) => { setPreorderOnly(e.target.checked); if (e.target.checked) setLayawayOnly(false) }}
             className="w-4 h-4 rounded border-gray-300 text-[#7C3AED] focus:ring-[#7C3AED]"
           />
           <Package size={16} className="text-[#7C3AED]" />
           Pre-orders Only
+        </label>
+        <label className="inline-flex items-center gap-2 cursor-pointer text-sm">
+          <input
+            type="checkbox"
+            checked={layawayOnly}
+            onChange={(e) => { setLayawayOnly(e.target.checked); if (e.target.checked) setPreorderOnly(false) }}
+            className="w-4 h-4 rounded border-gray-300 text-[#7C3AED] focus:ring-[#7C3AED]"
+          />
+          <Tag size={16} className="text-[#7C3AED]" />
+          Layaways Only
         </label>
         {preorderOnly && (
           <select value={fulfillmentFilter} onChange={(e) => setFulfillmentFilter(e.target.value)} className={filterSelectClass}>
@@ -262,6 +334,12 @@ export default function Invoices({ onNavigate, preorderOnly: initialPreorderOnly
                               PRE-ORDER
                             </span>
                           )}
+                          {inv.is_layaway && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700">
+                              LAYAWAY
+                            </span>
+                          )}
+                          <LayawayDueIcon invoice={inv} />
                         </div>
                       </td>
                       <td className="px-4 py-3 text-gray-700">{inv.customer_name || '—'}</td>
@@ -343,6 +421,12 @@ export default function Invoices({ onNavigate, preorderOnly: initialPreorderOnly
                   <PaymentStatusBadge status={inv.payment_status} />
                   <ShippingBadge option={inv.shipping_option} />
                   {inv.is_preorder && <FulfillmentBadge status={inv.fulfillment_status} />}
+                  {inv.is_layaway && (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700">
+                      {inv.layaway_status || 'Active'}
+                    </span>
+                  )}
+                  <LayawayDueIcon invoice={inv} />
                   {inv.status === 'voided' ? (
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">Voided</span>
                   ) : (
