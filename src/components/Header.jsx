@@ -1,9 +1,9 @@
-import { Plus, LogOut, Package, FileText, PackageCheck } from 'lucide-react'
+import { Plus, LogOut, Package, FileText, PackageCheck, Upload } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 
 const LOGO_URL = 'https://iixivpuyrxeoapsouszx.supabase.co/storage/v1/object/public/product-images/Logo.jpg'
 
-export default function Header({ onAdd, page, onNavigate }) {
+export default function Header({ onAdd, onBulkUpload, page, onNavigate }) {
   const { user, signOut } = useAuth()
 
   const navLinkClass = (target) =>
@@ -44,13 +44,22 @@ export default function Header({ onAdd, page, onNavigate }) {
           </div>
           <div className="flex items-center gap-3">
             {page === 'inventory' && (
-              <button
-                onClick={onAdd}
-                className="inline-flex items-center gap-2 bg-white text-[#7C3AED] px-4 py-2 rounded-lg hover:bg-purple-50 transition-colors font-semibold text-sm shadow-sm"
-              >
-                <Plus size={18} />
-                Add Product
-              </button>
+              <>
+                <button
+                  onClick={onBulkUpload}
+                  className="inline-flex items-center gap-2 bg-white/20 text-white px-4 py-2 rounded-lg hover:bg-white/30 transition-colors font-semibold text-sm"
+                >
+                  <Upload size={16} />
+                  <span className="hidden sm:inline">Bulk Upload</span>
+                </button>
+                <button
+                  onClick={onAdd}
+                  className="inline-flex items-center gap-2 bg-white text-[#7C3AED] px-4 py-2 rounded-lg hover:bg-purple-50 transition-colors font-semibold text-sm shadow-sm"
+                >
+                  <Plus size={18} />
+                  Add Product
+                </button>
+              </>
             )}
             <div className="hidden sm:block text-sm text-white/80 border-l border-white/20 pl-3">
               {user?.email}

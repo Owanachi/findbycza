@@ -9,6 +9,7 @@ import ProductModal from './components/ProductModal'
 import Header from './components/Header'
 import LowStockAlert from './components/LowStockAlert'
 import Login from './components/Login'
+import BulkUploadModal from './components/BulkUploadModal'
 import Invoices from './pages/Invoices'
 import NewInvoice from './pages/NewInvoice'
 import InvoiceDetail from './pages/InvoiceDetail'
@@ -73,6 +74,7 @@ function Inventory({ page, onNavigate }) {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(getStoredPageSize)
   const [filterSheetOpen, setFilterSheetOpen] = useState(false)
+  const [bulkUploadOpen, setBulkUploadOpen] = useState(false)
 
   const fetchAllProducts = useCallback(async () => {
     const { data } = await supabase.from('products').select('*')
@@ -111,8 +113,8 @@ function Inventory({ page, onNavigate }) {
   const fetchProducts = useCallback(async () => {
     setLoading(true)
 
-    // For Low Stock / In Stock we need client-side filtering (involves low_stock column comparison)
-    const needsClientFilter = status === 'Low Stock' || status === 'In Stock'
+    // For Low Stock / In Stock / Needs Pricing we need client-side filtering
+    const needsClientFilter = status === 'Low Stock' || status === 'In Stock' || status === 'Needs Pricing'
 
     let query = supabase.from('products').select('*', { count: 'exact' })
 
@@ -141,6 +143,8 @@ function Inventory({ page, onNavigate }) {
         filtered = filtered.filter((p) => p.qty > 0 && p.qty <= p.low_stock)
       } else if (status === 'In Stock') {
         filtered = filtered.filter((p) => p.qty > p.low_stock)
+      } else if (status === 'Needs Pricing') {
+        filtered = filtered.filter((p) => (Number(p.price) || 0) === 0)
       }
 
       if (needsClientFilter) {
@@ -238,6 +242,7 @@ function Inventory({ page, onNavigate }) {
   }
 
   const lowStockProducts = allProducts.filter((p) => p.qty <= p.low_stock)
+  const needsPricingCount = allProducts.filter((p) => (Number(p.price) || 0) === 0).length
 
   const filterSelectClass = 'w-full md:w-auto px-3 py-2.5 border border-[#EDE9FE] rounded-lg focus:ring-2 focus:ring-[#7C3AED] focus:border-[#7C3AED] outline-none bg-white text-base md:text-sm md:min-w-[160px]'
 
@@ -264,6 +269,7 @@ function Inventory({ page, onNavigate }) {
           <option value="In Stock">In Stock</option>
           <option value="Low Stock">Low Stock</option>
           <option value="Out of Stock">Out of Stock</option>
+          {needsPricingCount > 0 && <option value="Needs Pricing">Needs Pricing ({needsPricingCount})</option>}
         </select>
       </div>
       <div>
@@ -284,7 +290,7 @@ function Inventory({ page, onNavigate }) {
 
   return (
     <div className="min-h-screen bg-white">
-      <Header onAdd={handleAdd} page={page} onNavigate={onNavigate} />
+      <Header onAdd={handleAdd} onBulkUpload={() => setBulkUploadOpen(true)} page={page} onNavigate={onNavigate} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
         <Dashboard products={allProducts} />
@@ -366,6 +372,15 @@ function Inventory({ page, onNavigate }) {
       </main>
 
       {modalOpen && <ProductModal product={editProduct} allProducts={allProducts} onSave={handleSave} onClose={() => setModalOpen(false)} />}
+
+      {bulkUploadOpen && (
+        <BulkUploadModal
+          allProducts={allProducts}
+          userEmail={user?.email}
+          onClose={() => setBulkUploadOpen(false)}
+          onDone={() => { fetchAllProducts(); if (hasActiveFilters) fetchProducts() }}
+        />
+      )}
 
       {filterSheetOpen && <FilterSheet onClose={() => setFilterSheetOpen(false)}>{filterControls}</FilterSheet>}
 
