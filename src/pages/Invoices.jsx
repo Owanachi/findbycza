@@ -377,14 +377,14 @@ export default function Invoices({ onNavigate }) {
                   <tr className="bg-[#F5F3FF] border-b border-[#EDE9FE]">
                     <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Invoice #</th>
                     <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Customer</th>
-                    <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Updated By</th>
+                   <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Updated By</th>
                     <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Date</th>
                     <th className="text-right px-4 py-3 font-semibold text-[#7C3AED]">Total</th>
                     <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Payment</th>
-                    <th className="text-center px-4 py-3 font-semibold text-[#7C3AED]">Pay Status</th>
+                    <th className="text-center px-4 py-3 font-semibold text-[#7C3AED]">Status</th>
                     <th className="text-center px-4 py-3 font-semibold text-[#7C3AED]">Shipping</th>
                     {orderTypeFilters.has('preorder') && <th className="text-center px-4 py-3 font-semibold text-[#7C3AED]">Fulfillment</th>}
-                    <th className="text-center px-4 py-3 font-semibold text-[#7C3AED]">Status</th>
+                    <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Updated By</th>
                     <th className="text-center px-4 py-3 font-semibold text-[#7C3AED]">Actions</th>
                   </tr>
                 </thead>
@@ -415,6 +415,7 @@ export default function Invoices({ onNavigate }) {
                       <td className="px-4 py-3 text-gray-700">
                         <p>{inv.customer_name || '—'}</p>
                       </td>
+
                       <td className="px-4 py-3 text-gray-600">{inv.updated_by || '—'}</td>
                       <td className="px-4 py-3 text-gray-500">{formatDate(inv.created_at)}</td>
                       <td className="px-4 py-3 text-right font-semibold text-gray-800">
@@ -434,17 +435,7 @@ export default function Invoices({ onNavigate }) {
                           ) : '—'}
                         </td>
                       )}
-                      <td className="px-4 py-3 text-center">
-                        {inv.status === 'voided' ? (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">
-                            Voided
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">
-                            Active
-                          </span>
-                        )}
-                      </td>
+                      <td className="px-4 py-3 text-gray-600">{inv.updated_by || '—'}</td>
                       <td className="px-4 py-3 text-center">
                         <div className="inline-flex items-center gap-2">
                           <a
@@ -509,6 +500,7 @@ export default function Invoices({ onNavigate }) {
                       </span>
                     )}
                     <LayawayDueIcon invoice={inv} />
+<
                     {inv.status === 'voided' ? (
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">Voided</span>
                     ) : (
