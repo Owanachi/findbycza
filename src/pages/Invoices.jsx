@@ -377,14 +377,13 @@ export default function Invoices({ onNavigate }) {
                   <tr className="bg-[#F5F3FF] border-b border-[#EDE9FE]">
                     <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Invoice #</th>
                     <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Customer</th>
-                   <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Updated By</th>
+                    <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Updated By</th>
                     <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Date</th>
                     <th className="text-right px-4 py-3 font-semibold text-[#7C3AED]">Total</th>
                     <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Payment</th>
                     <th className="text-center px-4 py-3 font-semibold text-[#7C3AED]">Status</th>
                     <th className="text-center px-4 py-3 font-semibold text-[#7C3AED]">Shipping</th>
                     {orderTypeFilters.has('preorder') && <th className="text-center px-4 py-3 font-semibold text-[#7C3AED]">Fulfillment</th>}
-                    <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Updated By</th>
                     <th className="text-center px-4 py-3 font-semibold text-[#7C3AED]">Actions</th>
                   </tr>
                 </thead>
@@ -396,64 +395,62 @@ export default function Invoices({ onNavigate }) {
                         key={inv.id}
                         className="border-b border-[#EDE9FE]/60 hover:bg-[#EDE9FE]/30 transition-colors"
                       >
-                      <td className="px-4 py-3 font-medium text-[#6D28D9]">
-                        <div className="flex items-center gap-1.5">
-                          {inv.invoice_number}
-                          {invoiceOrderType === 'preorder' && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700">
-                              PRE-ORDER
-                            </span>
-                          )}
-                          {invoiceOrderType === 'layaway' && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700">
-                              LAYAWAY
-                            </span>
-                          )}
-                          <LayawayDueIcon invoice={inv} />
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-gray-700">
-                        <p>{inv.customer_name || '—'}</p>
-                      </td>
-
-                      <td className="px-4 py-3 text-gray-600">{inv.updated_by || '—'}</td>
-                      <td className="px-4 py-3 text-gray-500">{formatDate(inv.created_at)}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-gray-800">
-                        {formatCurrency(inv.total)}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600">{inv.payment_method || '—'}</td>
-                      <td className="px-4 py-3 text-center">
-                        <PaymentStatusBadge status={inv.payment_status} />
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <ShippingBadge option={inv.shipping_option} />
-                      </td>
-                      {orderTypeFilters.has('preorder') && (
-                        <td className="px-4 py-3 text-center">
-                          {invoiceOrderType === 'preorder' ? (
-                            <FulfillmentBadge status={inv.fulfillment_status} />
-                          ) : '—'}
+                        <td className="px-4 py-3 font-medium text-[#6D28D9]">
+                          <div className="flex items-center gap-1.5">
+                            {inv.invoice_number}
+                            {invoiceOrderType === 'preorder' && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700">
+                                PRE-ORDER
+                              </span>
+                            )}
+                            {invoiceOrderType === 'layaway' && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700">
+                                LAYAWAY
+                              </span>
+                            )}
+                            <LayawayDueIcon invoice={inv} />
+                          </div>
                         </td>
-                      )}
-                      <td className="px-4 py-3 text-gray-600">{inv.updated_by || '—'}</td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="inline-flex items-center gap-2">
-                          <a
-                            href={`#/invoices/${inv.id}`}
-                            className="inline-flex items-center gap-1 text-[#7C3AED] hover:text-[#6D28D9] font-medium text-sm transition-colors"
-                          >
-                            <Eye size={15} />
-                            View
-                          </a>
-                          <a
-                            href={`#/invoices/${inv.id}/edit`}
-                            className="inline-flex items-center gap-1 text-gray-400 hover:text-[#7C3AED] font-medium text-sm transition-colors"
-                            title="Edit Invoice"
-                          >
-                            <Pencil size={14} />
-                          </a>
-                        </div>
-                      </td>
+                        <td className="px-4 py-3 text-gray-700">
+                          <p>{inv.customer_name || '—'}</p>
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">{inv.updated_by || '—'}</td>
+                        <td className="px-4 py-3 text-gray-500">{formatDate(inv.created_at)}</td>
+                        <td className="px-4 py-3 text-right font-semibold text-gray-800">
+                          {formatCurrency(inv.total)}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">{inv.payment_method || '—'}</td>
+                        <td className="px-4 py-3 text-center">
+                          <PaymentStatusBadge status={inv.payment_status} />
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <ShippingBadge option={inv.shipping_option} />
+                        </td>
+                        {orderTypeFilters.has('preorder') && (
+                          <td className="px-4 py-3 text-center">
+                            {invoiceOrderType === 'preorder' ? (
+                              <FulfillmentBadge status={inv.fulfillment_status} />
+                            ) : '—'}
+                          </td>
+                        )}
+                        <td className="px-4 py-3 text-center">
+                          <div className="inline-flex items-center gap-2">
+                            <a
+                              href={`#/invoices/${inv.id}`}
+                              className="inline-flex items-center gap-1 text-[#7C3AED] hover:text-[#6D28D9] font-medium text-sm transition-colors"
+                            >
+                              <Eye size={15} />
+                              View
+                            </a>
+                            <a
+                              href={`#/invoices/${inv.id}/edit`}
+                              className="inline-flex items-center gap-1 text-gray-400 hover:text-[#7C3AED] font-medium text-sm transition-colors"
+                              title="Edit Invoice"
+                            >
+                              <Pencil size={14} />
+                            </a>
+                          </div>
+                        </td>
                       </tr>
                     )
                   })}
@@ -500,7 +497,6 @@ export default function Invoices({ onNavigate }) {
                       </span>
                     )}
                     <LayawayDueIcon invoice={inv} />
-<
                     {inv.status === 'voided' ? (
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">Voided</span>
                     ) : (
