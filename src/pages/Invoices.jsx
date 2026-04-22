@@ -86,7 +86,7 @@ function getYearForInvoice(invoice) {
 }
 
 function buildCanonicalInvoiceNumber(year, seq) {
-  return `FFC-${year}-${String(seq).padStart(4, '0')}`
+  return `FFZ-${year}-${String(seq).padStart(4, '0')}`
 }
 
 function getInvoiceOrderType(invoice) {
