@@ -84,7 +84,7 @@ function VoidModal({ onConfirm, onClose, voiding }) {
 }
 
 // ─── Link Product Modal (Pre-order arrival) ──────────────────────────
-function LinkProductModal({ invoice, onClose, onLinked }) {
+function LinkProductModal({ invoice, onClose, onLinked, userEmail }) {
   const [products, setProducts] = useState([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
@@ -114,7 +114,7 @@ function LinkProductModal({ invoice, onClose, onLinked }) {
   async function handleSelect(product) {
     const { error } = await supabase
       .from('invoices')
-      .update({ fulfillment_status: 'Ready', linked_product_id: product.id })
+      .update({ fulfillment_status: 'Ready', linked_product_id: product.id, updated_by: userEmail || null })
       .eq('id', invoice.id)
     if (error) {
       toast.error('Failed to link product')
@@ -825,6 +825,7 @@ export default function InvoiceDetail({ invoiceId, autoEdit }) {
         status: 'voided',
         void_reason: reason,
         voided_at: new Date().toISOString(),
+        updated_by: user?.email || null,
       })
       .eq('id', invoiceId)
 
@@ -1150,6 +1151,8 @@ export default function InvoiceDetail({ invoiceId, autoEdit }) {
                 <p className="text-2xl font-extrabold text-[#7C3AED] tracking-tight print:text-gray-900">INVOICE</p>
                 <p className="text-sm font-semibold text-gray-700 mt-1">{invoice.invoice_number}</p>
                 <p className="text-sm text-gray-500">{formatDate(invoice.created_at)}</p>
+                <p className="text-xs text-gray-400 mt-1">Created by: {invoice.created_by || 'Unknown'}</p>
+                <p className="text-xs text-gray-400">Last updated by: {invoice.updated_by || invoice.created_by || 'Unknown'}</p>
               </div>
             </div>
 
@@ -1322,7 +1325,7 @@ export default function InvoiceDetail({ invoiceId, autoEdit }) {
         <VoidModal voiding={voiding} onConfirm={handleVoid} onClose={() => setVoidModalOpen(false)} />
       )}
       {linkModalOpen && (
-        <LinkProductModal invoice={invoice} onClose={() => setLinkModalOpen(false)} onLinked={fetchInvoice} />
+        <LinkProductModal invoice={invoice} userEmail={user?.email} onClose={() => setLinkModalOpen(false)} onLinked={fetchInvoice} />
       )}
       {editModalOpen && (
         <EditInvoiceModal

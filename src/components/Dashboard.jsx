@@ -1,9 +1,10 @@
 import { Package, AlertTriangle, Layers, ChevronRight } from 'lucide-react'
+import { isLowStockProduct } from '../lib/inventoryFilters'
 
 export default function Dashboard({ products }) {
   const totalProducts = products.length
   const totalValue = products.reduce((sum, p) => sum + p.price * p.qty, 0)
-  const lowStock = products.filter((p) => p.qty <= p.low_stock).length
+  const lowStock = products.filter(isLowStockProduct).length
   const categories = new Set(products.map((p) => p.category).filter(Boolean)).size
 
   const stats = [
@@ -45,7 +46,10 @@ export default function Dashboard({ products }) {
             <button
               key={s.label}
               aria-label="View low stock items"
-              onClick={() => { window.location.hash = '#/inventory?filter=low-stock' }}
+              onClick={() => {
+                window.location.hash = '#/?filter=low-stock'
+                window.dispatchEvent(new HashChangeEvent('hashchange'))
+              }}
               className="relative bg-white rounded-xl p-5 shadow-sm border border-[#EDE9FE] overflow-hidden text-left w-full cursor-pointer hover:shadow-md hover:bg-purple-50 transition-all"
             >
               {cardInner}
@@ -62,6 +66,7 @@ export default function Dashboard({ products }) {
           </div>
         )
       })}
+
     </div>
   )
 }

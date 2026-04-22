@@ -12,6 +12,36 @@ function isHttpUrl(str) {
   return typeof str === 'string' && str.startsWith('http')
 }
 
+function extractInvoiceParts(invoiceNumber) {
+  const m = String(invoiceNumber || '').match(/^([A-Za-z]+)-(\d{4})-(\d{4})$/)
+  if (!m) return null
+  return { prefix: m[1], year: Number(m[2]), seq: Number(m[3]) }
+}
+
+async function generateNextInvoiceNumber() {
+  const now = new Date()
+  const year = now.getFullYear()
+
+  const { data, error } = await supabase
+    .from('invoices')
+    .select('invoice_number')
+    .not('invoice_number', 'is', null)
+
+  if (error) throw error
+
+  let maxSeq = 0
+
+  for (const row of data || []) {
+    const parts = extractInvoiceParts(row.invoice_number)
+    if (!parts) continue
+    if (parts.year === year) {
+      if (parts.seq > maxSeq) maxSeq = parts.seq
+    }
+  }
+
+  return `FFC-${year}-${String(maxSeq + 1).padStart(4, '0')}`
+}
+
 function ProductThumb({ img, name }) {
   if (isHttpUrl(img)) {
     return <img src={img} alt={name} className="w-10 h-10 rounded-lg object-cover" />
@@ -238,8 +268,10 @@ export default function NewInvoice() {
         else if (paidNum > 0) finalPaymentStatus = 'Partially Paid'
         else finalPaymentStatus = 'Unpaid'
       }
+      const invoiceNumber = await generateNextInvoiceNumber()
 
       const invoiceRow = {
+        invoice_number: invoiceNumber,
         customer_name: customerName.trim() || null,
         customer_contact: customerContact.trim() || null,
         subtotal,
@@ -261,11 +293,21 @@ export default function NewInvoice() {
         created_by: user?.email || null,
       }
 
-      const { data: invoice, error: invErr } = await supabase
+      let { data: invoice, error: invErr } = await supabase
         .from('invoices')
         .insert([invoiceRow])
         .select()
         .single()
+
+      // Handle rare race where two users generate the same invoice number at once.
+      if (invErr?.code === '23505') {
+        const retryInvoiceNumber = await generateNextInvoiceNumber()
+        ;({ data: invoice, error: invErr } = await supabase
+          .from('invoices')
+          .insert([{ ...invoiceRow, invoice_number: retryInvoiceNumber }])
+          .select()
+          .single())
+      }
 
       if (invErr || !invoice) {
         toast.error(`Failed to create invoice: ${invErr?.message || 'Unknown error'}`)

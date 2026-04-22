@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Toaster, toast } from 'react-hot-toast'
 import { Loader2, Search, X, SlidersHorizontal } from 'lucide-react'
 import { supabase } from './lib/supabase'
+import { getHashFilter, isLowStockProduct } from './lib/inventoryFilters'
 import { AuthProvider, useAuth } from './lib/AuthContext'
 import Dashboard from './components/Dashboard'
 import ProductTable from './components/ProductTable'
@@ -75,6 +76,15 @@ function Inventory({ page, onNavigate }) {
   const [filterSheetOpen, setFilterSheetOpen] = useState(false)
   const [bulkUploadOpen, setBulkUploadOpen] = useState(false)
 
+  const applyHashFilters = useCallback(() => {
+    if (getHashFilter() === 'low-stock') {
+      setStatus('Low Stock')
+      return
+    }
+    // If user leaves the deep-link, clear only that auto-applied state.
+    setStatus((prev) => (prev === 'Low Stock' ? 'All' : prev))
+  }, [])
+
   const fetchAllProducts = useCallback(async () => {
     const { data } = await supabase.from('products').select('*')
     if (data) {
@@ -139,7 +149,7 @@ function Inventory({ page, onNavigate }) {
     } else {
       let filtered = data || []
       if (status === 'Low Stock') {
-        filtered = filtered.filter((p) => p.qty > 0 && p.qty <= p.low_stock)
+        filtered = filtered.filter(isLowStockProduct)
       } else if (status === 'In Stock') {
         filtered = filtered.filter((p) => p.qty > p.low_stock)
       } else if (status === 'Needs Pricing') {
@@ -168,6 +178,32 @@ function Inventory({ page, onNavigate }) {
 
   const clearFilters = () => {
     setSearch(''); setCategory('All'); setSubCategory('All'); setStatus('All'); setMinPrice(''); setMaxPrice('')
+    const hashPath = (window.location.hash || '#/').split('?')[0] || '#/'
+    if (getHashFilter() === 'low-stock') {
+      window.location.hash = hashPath
+      window.dispatchEvent(new HashChangeEvent('hashchange'))
+    }
+  }
+
+  const updateLowStockHash = useCallback((nextStatus) => {
+    const currentHash = window.location.hash || '#/'
+    const [pathPart, queryPart = ''] = currentHash.split('?')
+    const path = pathPart || '#/'
+    const params = new URLSearchParams(queryPart)
+
+    if (nextStatus === 'Low Stock') params.set('filter', 'low-stock')
+    else if (params.get('filter') === 'low-stock') params.delete('filter')
+
+    const nextHash = params.toString() ? `${path}?${params.toString()}` : path
+    if (nextHash !== currentHash) {
+      window.location.hash = nextHash
+      window.dispatchEvent(new HashChangeEvent('hashchange'))
+    }
+  }, [])
+
+  const handleStatusChange = (nextStatus) => {
+    setStatus(nextStatus)
+    updateLowStockHash(nextStatus)
   }
 
   const subCategories = category !== 'All' && allSubCategories[category] ? ['All', ...allSubCategories[category]] : ['All']
@@ -242,12 +278,13 @@ function Inventory({ page, onNavigate }) {
 
   const needsPricingCount = allProducts.filter((p) => (Number(p.price) || 0) === 0).length
 
-  // Pre-apply Low Stock filter when arriving via the dashboard stat card link
+  // Pre-apply and keep Low Stock filter in sync when using dashboard deep-link.
   useEffect(() => {
-    if (window.location.hash.includes('filter=low-stock')) {
-      setStatus('Low Stock')
-    }
-  }, [])
+    applyHashFilters()
+    const onHashChange = () => applyHashFilters()
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
+  }, [applyHashFilters])
 
   const filterSelectClass = 'w-full md:w-auto px-3 py-2.5 border border-[#EDE9FE] rounded-lg focus:ring-2 focus:ring-[#7C3AED] focus:border-[#7C3AED] outline-none bg-white text-base md:text-sm md:min-w-[160px]'
 
@@ -269,7 +306,7 @@ function Inventory({ page, onNavigate }) {
       </div>
       <div>
         <label className="block text-xs font-medium text-gray-500 mb-1 md:hidden">Status</label>
-        <select value={status} onChange={(e) => setStatus(e.target.value)} className={filterSelectClass}>
+        <select value={status} onChange={(e) => handleStatusChange(e.target.value)} className={filterSelectClass}>
           <option value="All">All Status</option>
           <option value="In Stock">In Stock</option>
           <option value="Low Stock">Low Stock</option>
@@ -305,7 +342,7 @@ function Inventory({ page, onNavigate }) {
             <span className="inline-flex items-center gap-1.5 bg-[#7C3AED] text-white text-sm font-medium px-3 py-1.5 rounded-full">
               Filtered: Low Stock
               <button
-                onClick={() => { setStatus('All'); window.location.hash = '#/' }}
+                onClick={() => { handleStatusChange('All') }}
                 className="ml-1 hover:bg-white/20 rounded-full p-0.5 transition-colors"
                 aria-label="Clear low stock filter"
               >
