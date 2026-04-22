@@ -166,7 +166,6 @@ export default function Invoices({ onNavigate }) {
     fetchInvoices()
   }, [])
 
-  // Pre-order summary
   const preorderSummary = useMemo(() => {
     const preorders = invoices.filter((inv) => getInvoiceOrderType(inv) === 'preorder')
     const totalBalance = preorders.reduce((sum, inv) => sum + Math.max(0, (inv.total || 0) - (inv.amount_paid || 0)), 0)
@@ -178,7 +177,6 @@ export default function Invoices({ onNavigate }) {
     return { count: preorders.length, totalBalance, byFulfillment }
   }, [invoices])
 
-  // Layaway summary
   const layawaySummary = useMemo(() => {
     const layaways = invoices.filter((inv) => getInvoiceOrderType(inv) === 'layaway')
     const active = layaways.filter((inv) => inv.layaway_status === 'Active')
@@ -224,7 +222,6 @@ export default function Invoices({ onNavigate }) {
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
           <h2 className="text-2xl font-bold text-[#7C3AED]">Invoices</h2>
@@ -239,7 +236,6 @@ export default function Invoices({ onNavigate }) {
         </a>
       </div>
 
-      {/* Pre-order summary banner */}
       {orderTypeFilters.has('preorder') && preorderSummary.count > 0 && (
         <div className="mb-6 bg-purple-50 border border-purple-200 rounded-xl p-4">
           <div className="flex flex-wrap gap-6 text-sm">
@@ -261,7 +257,6 @@ export default function Invoices({ onNavigate }) {
         </div>
       )}
 
-      {/* Layaway summary banner */}
       {orderTypeFilters.has('layaway') && layawaySummary.active > 0 && (
         <div className="mb-6 bg-indigo-50 border border-indigo-200 rounded-xl p-4">
           <div className="flex flex-wrap gap-6 text-sm">
@@ -289,7 +284,6 @@ export default function Invoices({ onNavigate }) {
         </div>
       )}
 
-      {/* Search & filters */}
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <div className="relative max-w-xs flex-1 min-w-[200px]">
           <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7C3AED]" />
@@ -342,7 +336,6 @@ export default function Invoices({ onNavigate }) {
         )}
       </div>
 
-      {/* Content */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 size={32} className="animate-spin text-[#7C3AED]" />
@@ -369,7 +362,6 @@ export default function Invoices({ onNavigate }) {
         </div>
       ) : (
         <>
-          {/* Desktop table */}
           <div className="hidden md:block bg-white rounded-xl shadow-sm border border-[#EDE9FE] overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -377,19 +369,13 @@ export default function Invoices({ onNavigate }) {
                   <tr className="bg-[#F5F3FF] border-b border-[#EDE9FE]">
                     <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Invoice #</th>
                     <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Customer</th>
-
-
                     <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Date</th>
                     <th className="text-right px-4 py-3 font-semibold text-[#7C3AED]">Total</th>
                     <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Payment</th>
                     <th className="text-center px-4 py-3 font-semibold text-[#7C3AED]">Status</th>
                     <th className="text-center px-4 py-3 font-semibold text-[#7C3AED]">Shipping</th>
-                    <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Updated By</th>
                     {orderTypeFilters.has('preorder') && <th className="text-center px-4 py-3 font-semibold text-[#7C3AED]">Fulfillment</th>}
-                    {/* Keep Updated By after Shipping/Fulfillment and before Actions */}
                     <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Updated By</th>
-
-
                     <th className="text-center px-4 py-3 font-semibold text-[#7C3AED]">Actions</th>
                   </tr>
                 </thead>
@@ -397,68 +383,7 @@ export default function Invoices({ onNavigate }) {
                   {filtered.map((inv) => {
                     const invoiceOrderType = getInvoiceOrderType(inv)
                     return (
-                      <tr
-                        key={inv.id}
-                        className="border-b border-[#EDE9FE]/60 hover:bg-[#EDE9FE]/30 transition-colors"
-                      >
-                      <td className="px-4 py-3 font-medium text-[#6D28D9]">
-                        <div className="flex items-center gap-1.5">
-                          {inv.invoice_number}
-                          {invoiceOrderType === 'preorder' && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700">
-                              PRE-ORDER
-                            </span>
-                          )}
-                          {invoiceOrderType === 'layaway' && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700">
-                              LAYAWAY
-                            </span>
-                          )}
-                          <LayawayDueIcon invoice={inv} />
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-gray-700">
-                        <p>{inv.customer_name || '—'}</p>
-                      </td>
-                      <td className="px-4 py-3 text-gray-500">{formatDate(inv.created_at)}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-gray-800">
-                        {formatCurrency(inv.total)}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600">{inv.payment_method || '—'}</td>
-                      <td className="px-4 py-3 text-center">
-                        <PaymentStatusBadge status={inv.payment_status} />
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <ShippingBadge option={inv.shipping_option} />
-                      </td>
-                      {orderTypeFilters.has('preorder') && (
-                        <td className="px-4 py-3 text-center">
-                          {invoiceOrderType === 'preorder' ? (
-                            <FulfillmentBadge status={inv.fulfillment_status} />
-                          ) : '—'}
-                        </td>
-                      )}
-                      {/* Keep Updated By after Shipping/Fulfillment and before Actions */}
-                      <td className="px-4 py-3 text-gray-600">{inv.updated_by || '—'}</td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="inline-flex items-center gap-2">
-                          <a
-                            href={`#/invoices/${inv.id}`}
-                            className="inline-flex items-center gap-1 text-[#7C3AED] hover:text-[#6D28D9] font-medium text-sm transition-colors"
-                          >
-                            <Eye size={15} />
-                            View
-                          </a>
-                          <a
-                            href={`#/invoices/${inv.id}/edit`}
-                            className="inline-flex items-center gap-1 text-gray-400 hover:text-[#7C3AED] font-medium text-sm transition-colors"
-                            title="Edit Invoice"
-                          >
-                            <Pencil size={14} />
-                          </a>
-                        </div>
-                      </td>
-
+                      <tr key={inv.id} className="border-b border-[#EDE9FE]/60 hover:bg-[#EDE9FE]/30 transition-colors">
                         <td className="px-4 py-3 font-medium text-[#6D28D9]">
                           <div className="flex items-center gap-1.5">
                             {inv.invoice_number}
@@ -478,11 +403,8 @@ export default function Invoices({ onNavigate }) {
                         <td className="px-4 py-3 text-gray-700">
                           <p>{inv.customer_name || '—'}</p>
                         </td>
-                        <td className="px-4 py-3 text-gray-600">{inv.updated_by || '—'}</td>
                         <td className="px-4 py-3 text-gray-500">{formatDate(inv.created_at)}</td>
-                        <td className="px-4 py-3 text-right font-semibold text-gray-800">
-                          {formatCurrency(inv.total)}
-                        </td>
+                        <td className="px-4 py-3 text-right font-semibold text-gray-800">{formatCurrency(inv.total)}</td>
                         <td className="px-4 py-3 text-gray-600">{inv.payment_method || '—'}</td>
                         <td className="px-4 py-3 text-center">
                           <PaymentStatusBadge status={inv.payment_status} />
@@ -492,11 +414,10 @@ export default function Invoices({ onNavigate }) {
                         </td>
                         {orderTypeFilters.has('preorder') && (
                           <td className="px-4 py-3 text-center">
-                            {invoiceOrderType === 'preorder' ? (
-                              <FulfillmentBadge status={inv.fulfillment_status} />
-                            ) : '—'}
+                            {invoiceOrderType === 'preorder' ? <FulfillmentBadge status={inv.fulfillment_status} /> : '—'}
                           </td>
                         )}
+                        <td className="px-4 py-3 text-gray-600">{inv.updated_by || '—'}</td>
                         <td className="px-4 py-3 text-center">
                           <div className="inline-flex items-center gap-2">
                             <a
@@ -523,7 +444,6 @@ export default function Invoices({ onNavigate }) {
             </div>
           </div>
 
-          {/* Mobile cards */}
           <div className="md:hidden space-y-3">
             {filtered.map((inv) => {
               const invoiceOrderType = getInvoiceOrderType(inv)
@@ -561,8 +481,6 @@ export default function Invoices({ onNavigate }) {
                       </span>
                     )}
                     <LayawayDueIcon invoice={inv} />
-
-
                     {inv.status === 'voided' ? (
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">Voided</span>
                     ) : (
