@@ -89,13 +89,18 @@ function buildCanonicalInvoiceNumber(year, seq) {
   return `FFC-${year}-${String(seq).padStart(4, '0')}`
 }
 
+function getInvoiceOrderType(invoice) {
+  if (invoice.is_preorder) return 'preorder'
+  if (invoice.is_layaway) return 'layaway'
+  if (invoice.order_type === 'preorder' || invoice.order_type === 'layaway') return invoice.order_type
+  return 'cash_sale'
+}
+
 export default function Invoices({ onNavigate }) {
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [paymentFilter, setPaymentFilter] = useState('All')
-  // TODO: migration 002 must run for Pre-orders/Layaways filtering to work;
-  // until then, order_type is null on all rows and only Cash Sales chip will match.
   const [orderTypeFilters, setOrderTypeFilters] = useState(new Set())
   const [fulfillmentFilter, setFulfillmentFilter] = useState('All')
 
@@ -163,7 +168,7 @@ export default function Invoices({ onNavigate }) {
 
   // Pre-order summary
   const preorderSummary = useMemo(() => {
-    const preorders = invoices.filter((inv) => inv.is_preorder)
+    const preorders = invoices.filter((inv) => getInvoiceOrderType(inv) === 'preorder')
     const totalBalance = preorders.reduce((sum, inv) => sum + Math.max(0, (inv.total || 0) - (inv.amount_paid || 0)), 0)
     const byFulfillment = {}
     for (const inv of preorders) {
@@ -175,7 +180,7 @@ export default function Invoices({ onNavigate }) {
 
   // Layaway summary
   const layawaySummary = useMemo(() => {
-    const layaways = invoices.filter((inv) => inv.is_layaway)
+    const layaways = invoices.filter((inv) => getInvoiceOrderType(inv) === 'layaway')
     const active = layaways.filter((inv) => inv.layaway_status === 'Active')
     const totalBalance = active.reduce((sum, inv) => sum + Math.max(0, (inv.total || 0) - (inv.amount_paid || 0)), 0)
     const now = new Date()
@@ -204,10 +209,10 @@ export default function Invoices({ onNavigate }) {
       }
       if (paymentFilter !== 'All' && (inv.payment_status || 'Unpaid') !== paymentFilter) return false
       if (orderTypeFilters.size > 0) {
-        const ot = inv.order_type ?? null
-        const cashMatch = orderTypeFilters.has('cash_sale') && (ot === 'cash_sale' || ot === null)
-        const preMatch = orderTypeFilters.has('preorder') && ot === 'preorder'
-        const layMatch = orderTypeFilters.has('layaway') && ot === 'layaway'
+        const orderType = getInvoiceOrderType(inv)
+        const cashMatch = orderTypeFilters.has('cash_sale') && orderType === 'cash_sale'
+        const preMatch = orderTypeFilters.has('preorder') && orderType === 'preorder'
+        const layMatch = orderTypeFilters.has('layaway') && orderType === 'layaway'
         if (!cashMatch && !preMatch && !layMatch) return false
       }
       if (orderTypeFilters.has('preorder') && fulfillmentFilter !== 'All' && (inv.fulfillment_status || 'Pending') !== fulfillmentFilter) return false
@@ -372,33 +377,34 @@ export default function Invoices({ onNavigate }) {
                   <tr className="bg-[#F5F3FF] border-b border-[#EDE9FE]">
                     <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Invoice #</th>
                     <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Customer</th>
-                    <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Created By</th>
-                    <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Updated By</th>
                     <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Date</th>
                     <th className="text-right px-4 py-3 font-semibold text-[#7C3AED]">Total</th>
                     <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Payment</th>
-                    <th className="text-center px-4 py-3 font-semibold text-[#7C3AED]">Pay Status</th>
+                    <th className="text-center px-4 py-3 font-semibold text-[#7C3AED]">Status</th>
                     <th className="text-center px-4 py-3 font-semibold text-[#7C3AED]">Shipping</th>
                     {orderTypeFilters.has('preorder') && <th className="text-center px-4 py-3 font-semibold text-[#7C3AED]">Fulfillment</th>}
-                    <th className="text-center px-4 py-3 font-semibold text-[#7C3AED]">Status</th>
+                    {/* Keep Updated By after Shipping/Fulfillment and before Actions */}
+                    <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Updated By</th>
                     <th className="text-center px-4 py-3 font-semibold text-[#7C3AED]">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((inv) => (
-                    <tr
-                      key={inv.id}
-                      className="border-b border-[#EDE9FE]/60 hover:bg-[#EDE9FE]/30 transition-colors"
-                    >
+                  {filtered.map((inv) => {
+                    const invoiceOrderType = getInvoiceOrderType(inv)
+                    return (
+                      <tr
+                        key={inv.id}
+                        className="border-b border-[#EDE9FE]/60 hover:bg-[#EDE9FE]/30 transition-colors"
+                      >
                       <td className="px-4 py-3 font-medium text-[#6D28D9]">
                         <div className="flex items-center gap-1.5">
                           {inv.invoice_number}
-                          {inv.is_preorder && (
+                          {invoiceOrderType === 'preorder' && (
                             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700">
                               PRE-ORDER
                             </span>
                           )}
-                          {inv.is_layaway && (
+                          {invoiceOrderType === 'layaway' && (
                             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700">
                               LAYAWAY
                             </span>
@@ -409,8 +415,6 @@ export default function Invoices({ onNavigate }) {
                       <td className="px-4 py-3 text-gray-700">
                         <p>{inv.customer_name || '—'}</p>
                       </td>
-                      <td className="px-4 py-3 text-gray-600">{inv.created_by || '—'}</td>
-                      <td className="px-4 py-3 text-gray-600">{inv.updated_by || '—'}</td>
                       <td className="px-4 py-3 text-gray-500">{formatDate(inv.created_at)}</td>
                       <td className="px-4 py-3 text-right font-semibold text-gray-800">
                         {formatCurrency(inv.total)}
@@ -424,22 +428,13 @@ export default function Invoices({ onNavigate }) {
                       </td>
                       {orderTypeFilters.has('preorder') && (
                         <td className="px-4 py-3 text-center">
-                          {inv.is_preorder ? (
+                          {invoiceOrderType === 'preorder' ? (
                             <FulfillmentBadge status={inv.fulfillment_status} />
                           ) : '—'}
                         </td>
                       )}
-                      <td className="px-4 py-3 text-center">
-                        {inv.status === 'voided' ? (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">
-                            Voided
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">
-                            Active
-                          </span>
-                        )}
-                      </td>
+                      {/* Keep Updated By after Shipping/Fulfillment and before Actions */}
+                      <td className="px-4 py-3 text-gray-600">{inv.updated_by || '—'}</td>
                       <td className="px-4 py-3 text-center">
                         <div className="inline-flex items-center gap-2">
                           <a
@@ -458,8 +453,9 @@ export default function Invoices({ onNavigate }) {
                           </a>
                         </div>
                       </td>
-                    </tr>
-                  ))}
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -467,64 +463,66 @@ export default function Invoices({ onNavigate }) {
 
           {/* Mobile cards */}
           <div className="md:hidden space-y-3">
-            {filtered.map((inv) => (
-              <div key={inv.id} className="bg-white rounded-xl shadow-sm border border-[#EDE9FE] p-4">
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <span className="font-semibold text-[#6D28D9]">{inv.invoice_number}</span>
-                      {inv.is_preorder && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700">
-                          PRE-ORDER
-                        </span>
-                      )}
+            {filtered.map((inv) => {
+              const invoiceOrderType = getInvoiceOrderType(inv)
+              return (
+                <div key={inv.id} className="bg-white rounded-xl shadow-sm border border-[#EDE9FE] p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="font-semibold text-[#6D28D9]">{inv.invoice_number}</span>
+                        {invoiceOrderType === 'preorder' && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700">
+                            PRE-ORDER
+                          </span>
+                        )}
+                        {invoiceOrderType === 'layaway' && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700">
+                            LAYAWAY
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-700">{inv.customer_name || '—'}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">Updated By: {inv.updated_by || '—'}</p>
+                      <p className="text-xs text-gray-400">{formatDate(inv.created_at)}</p>
                     </div>
-                    <p className="text-sm text-gray-700">{inv.customer_name || '—'}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Created By: {inv.created_by || '—'}</p>
-                    <p className="text-xs text-gray-400">Updated By: {inv.updated_by || '—'}</p>
-                    <p className="text-xs text-gray-400">{formatDate(inv.created_at)}</p>
+                    <p className="text-lg font-bold text-gray-800">{formatCurrency(inv.total)}</p>
                   </div>
-                  <p className="text-lg font-bold text-gray-800">{formatCurrency(inv.total)}</p>
-                </div>
 
-                <div className="flex flex-wrap items-center gap-2 mb-3">
-                  <PaymentStatusBadge status={inv.payment_status} />
-                  <ShippingBadge option={inv.shipping_option} />
-                  {inv.is_preorder && <FulfillmentBadge status={inv.fulfillment_status} />}
-                  {inv.is_layaway && (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700">
-                      {inv.layaway_status || 'Active'}
-                    </span>
-                  )}
-                  <LayawayDueIcon invoice={inv} />
-                  {inv.status === 'voided' ? (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">Voided</span>
-                  ) : (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">Active</span>
-                  )}
-                </div>
+                  <div className="flex flex-wrap items-center gap-2 mb-3">
+                    <PaymentStatusBadge status={inv.payment_status} />
+                    <ShippingBadge option={inv.shipping_option} />
+                    {invoiceOrderType === 'preorder' && <FulfillmentBadge status={inv.fulfillment_status} />}
+                    {invoiceOrderType === 'layaway' && (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700">
+                        {inv.layaway_status || 'Active'}
+                      </span>
+                    )}
+                    <LayawayDueIcon invoice={inv} />
+                  </div>
 
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-500">{inv.payment_method || '—'}</span>
-                  <div className="inline-flex items-center gap-3">
-                    <a
-                      href={`#/invoices/${inv.id}`}
-                      className="inline-flex items-center gap-1 text-[#7C3AED] hover:text-[#6D28D9] font-medium text-sm transition-colors"
-                    >
-                      <Eye size={15} />
-                      View
-                    </a>
-                    <a
-                      href={`#/invoices/${inv.id}/edit`}
-                      className="inline-flex items-center gap-1 text-gray-400 hover:text-[#7C3AED] font-medium text-sm transition-colors"
-                      title="Edit Invoice"
-                    >
-                      <Pencil size={14} />
-                    </a>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-500">{inv.payment_method || '—'}</span>
+                    <div className="inline-flex items-center gap-3">
+                      <a
+                        href={`#/invoices/${inv.id}`}
+                        className="inline-flex items-center gap-1 text-[#7C3AED] hover:text-[#6D28D9] font-medium text-sm transition-colors"
+                      >
+                        <Eye size={15} />
+                        View
+                      </a>
+                      <a
+                        href={`#/invoices/${inv.id}/edit`}
+                        className="inline-flex items-center gap-1 text-gray-400 hover:text-[#7C3AED] font-medium text-sm transition-colors"
+                        title="Edit Invoice"
+                      >
+                        <Pencil size={14} />
+                      </a>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </>
       )}
