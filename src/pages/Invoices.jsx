@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Plus, Search, Eye, FileText, Loader2, Package, Pencil, Tag, Clock, AlertCircle } from 'lucide-react'
+import { Plus, Search, Eye, FileText, Loader2, Package, Pencil, Tag, Clock, AlertCircle, Check } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
 function formatDate(dateStr) {
@@ -77,14 +77,24 @@ function LayawayDueIcon({ invoice }) {
   return null
 }
 
-export default function Invoices({ onNavigate, preorderOnly: initialPreorderOnly, layawayOnly: initialLayawayOnly }) {
+export default function Invoices({ onNavigate }) {
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [paymentFilter, setPaymentFilter] = useState('All')
-  const [preorderOnly, setPreorderOnly] = useState(initialPreorderOnly || false)
-  const [layawayOnly, setLayawayOnly] = useState(initialLayawayOnly || false)
+  // TODO: migration 002 must run for Pre-orders/Layaways filtering to work;
+  // until then, order_type is null on all rows and only Cash Sales chip will match.
+  const [orderTypeFilters, setOrderTypeFilters] = useState(new Set())
   const [fulfillmentFilter, setFulfillmentFilter] = useState('All')
+
+  const toggleOrderTypeFilter = (key) => {
+    setOrderTypeFilters((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
 
   useEffect(() => {
     async function fetchInvoices() {
@@ -143,12 +153,17 @@ export default function Invoices({ onNavigate, preorderOnly: initialPreorderOnly
         if (!matchSearch) return false
       }
       if (paymentFilter !== 'All' && (inv.payment_status || 'Unpaid') !== paymentFilter) return false
-      if (preorderOnly && !inv.is_preorder) return false
-      if (preorderOnly && fulfillmentFilter !== 'All' && (inv.fulfillment_status || 'Pending') !== fulfillmentFilter) return false
-      if (layawayOnly && !inv.is_layaway) return false
+      if (orderTypeFilters.size > 0) {
+        const ot = inv.order_type ?? null
+        const cashMatch = orderTypeFilters.has('cash_sale') && (ot === 'cash_sale' || ot === null)
+        const preMatch = orderTypeFilters.has('preorder') && ot === 'preorder'
+        const layMatch = orderTypeFilters.has('layaway') && ot === 'layaway'
+        if (!cashMatch && !preMatch && !layMatch) return false
+      }
+      if (orderTypeFilters.has('preorder') && fulfillmentFilter !== 'All' && (inv.fulfillment_status || 'Pending') !== fulfillmentFilter) return false
       return true
     })
-  }, [invoices, search, paymentFilter, preorderOnly, fulfillmentFilter, layawayOnly])
+  }, [invoices, search, paymentFilter, orderTypeFilters, fulfillmentFilter])
 
   const filterSelectClass = 'px-3 py-2 text-sm border border-[#EDE9FE] rounded-lg bg-white focus:ring-2 focus:ring-[#7C3AED] focus:border-[#7C3AED] outline-none'
 
@@ -157,12 +172,8 @@ export default function Invoices({ onNavigate, preorderOnly: initialPreorderOnly
       {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
-          <h2 className="text-2xl font-bold text-[#7C3AED]">
-            {layawayOnly ? 'Layaways' : preorderOnly ? 'Pre-orders' : 'Invoices'}
-          </h2>
-          <p className="mt-1 text-sm text-gray-500">
-            {layawayOnly ? 'Track layaway reservations and payments' : preorderOnly ? 'Track and manage pre-ordered items' : 'Manage and track all your invoices'}
-          </p>
+          <h2 className="text-2xl font-bold text-[#7C3AED]">Invoices</h2>
+          <p className="mt-1 text-sm text-gray-500">Manage and track all your invoices</p>
         </div>
         <a
           href="#/invoices/new"
@@ -174,7 +185,7 @@ export default function Invoices({ onNavigate, preorderOnly: initialPreorderOnly
       </div>
 
       {/* Pre-order summary banner */}
-      {preorderOnly && preorderSummary.count > 0 && (
+      {orderTypeFilters.has('preorder') && preorderSummary.count > 0 && (
         <div className="mb-6 bg-purple-50 border border-purple-200 rounded-xl p-4">
           <div className="flex flex-wrap gap-6 text-sm">
             <div>
@@ -196,7 +207,7 @@ export default function Invoices({ onNavigate, preorderOnly: initialPreorderOnly
       )}
 
       {/* Layaway summary banner */}
-      {layawayOnly && layawaySummary.active > 0 && (
+      {orderTypeFilters.has('layaway') && layawaySummary.active > 0 && (
         <div className="mb-6 bg-indigo-50 border border-indigo-200 rounded-xl p-4">
           <div className="flex flex-wrap gap-6 text-sm">
             <div>
@@ -243,27 +254,28 @@ export default function Invoices({ onNavigate, preorderOnly: initialPreorderOnly
           <option value="Refunded">Refunded</option>
           <option value="Cancelled">Cancelled</option>
         </select>
-        <label className="inline-flex items-center gap-2 cursor-pointer text-sm">
-          <input
-            type="checkbox"
-            checked={preorderOnly}
-            onChange={(e) => { setPreorderOnly(e.target.checked); if (e.target.checked) setLayawayOnly(false) }}
-            className="w-4 h-4 rounded border-gray-300 text-[#7C3AED] focus:ring-[#7C3AED]"
-          />
-          <Package size={16} className="text-[#7C3AED]" />
-          Pre-orders Only
-        </label>
-        <label className="inline-flex items-center gap-2 cursor-pointer text-sm">
-          <input
-            type="checkbox"
-            checked={layawayOnly}
-            onChange={(e) => { setLayawayOnly(e.target.checked); if (e.target.checked) setPreorderOnly(false) }}
-            className="w-4 h-4 rounded border-gray-300 text-[#7C3AED] focus:ring-[#7C3AED]"
-          />
-          <Tag size={16} className="text-[#7C3AED]" />
-          Layaways Only
-        </label>
-        {preorderOnly && (
+        {[
+          { key: 'cash_sale', label: 'Cash Sales' },
+          { key: 'preorder', label: 'Pre-orders' },
+          { key: 'layaway', label: 'Layaways' },
+        ].map(({ key, label }) => {
+          const active = orderTypeFilters.has(key)
+          return (
+            <button
+              key={key}
+              onClick={() => toggleOrderTypeFilter(key)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                active
+                  ? 'bg-[#7C3AED] text-white border-[#6D28D9]'
+                  : 'bg-white text-gray-600 border-[#DDD6FE] hover:border-[#7C3AED]'
+              }`}
+            >
+              {active && <Check size={13} />}
+              {label}
+            </button>
+          )
+        })}
+        {orderTypeFilters.has('preorder') && (
           <select value={fulfillmentFilter} onChange={(e) => setFulfillmentFilter(e.target.value)} className={filterSelectClass}>
             <option value="All">All Fulfillment</option>
             <option value="Pending">Pending</option>
@@ -315,7 +327,7 @@ export default function Invoices({ onNavigate, preorderOnly: initialPreorderOnly
                     <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Payment</th>
                     <th className="text-center px-4 py-3 font-semibold text-[#7C3AED]">Pay Status</th>
                     <th className="text-center px-4 py-3 font-semibold text-[#7C3AED]">Shipping</th>
-                    {preorderOnly && <th className="text-center px-4 py-3 font-semibold text-[#7C3AED]">Fulfillment</th>}
+                    {orderTypeFilters.has('preorder') && <th className="text-center px-4 py-3 font-semibold text-[#7C3AED]">Fulfillment</th>}
                     <th className="text-center px-4 py-3 font-semibold text-[#7C3AED]">Status</th>
                     <th className="text-center px-4 py-3 font-semibold text-[#7C3AED]">Actions</th>
                   </tr>
@@ -354,7 +366,7 @@ export default function Invoices({ onNavigate, preorderOnly: initialPreorderOnly
                       <td className="px-4 py-3 text-center">
                         <ShippingBadge option={inv.shipping_option} />
                       </td>
-                      {preorderOnly && (
+                      {orderTypeFilters.has('preorder') && (
                         <td className="px-4 py-3 text-center">
                           {inv.is_preorder ? (
                             <FulfillmentBadge status={inv.fulfillment_status} />

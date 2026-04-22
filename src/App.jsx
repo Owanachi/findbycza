@@ -7,7 +7,6 @@ import Dashboard from './components/Dashboard'
 import ProductTable from './components/ProductTable'
 import ProductModal from './components/ProductModal'
 import Header from './components/Header'
-import LowStockAlert from './components/LowStockAlert'
 import Login from './components/Login'
 import BulkUploadModal from './components/BulkUploadModal'
 import Invoices from './pages/Invoices'
@@ -241,8 +240,14 @@ function Inventory({ page, onNavigate }) {
     try { localStorage.setItem(PAGE_SIZE_KEY, String(size)) } catch {}
   }
 
-  const lowStockProducts = allProducts.filter((p) => p.qty <= p.low_stock)
   const needsPricingCount = allProducts.filter((p) => (Number(p.price) || 0) === 0).length
+
+  // Pre-apply Low Stock filter when arriving via the dashboard stat card link
+  useEffect(() => {
+    if (window.location.hash.includes('filter=low-stock')) {
+      setStatus('Low Stock')
+    }
+  }, [])
 
   const filterSelectClass = 'w-full md:w-auto px-3 py-2.5 border border-[#EDE9FE] rounded-lg focus:ring-2 focus:ring-[#7C3AED] focus:border-[#7C3AED] outline-none bg-white text-base md:text-sm md:min-w-[160px]'
 
@@ -295,7 +300,20 @@ function Inventory({ page, onNavigate }) {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
         <Dashboard products={allProducts} />
 
-        {lowStockProducts.length > 0 && <LowStockAlert products={lowStockProducts} />}
+        {status === 'Low Stock' && (
+          <div className="mt-4 flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 bg-[#7C3AED] text-white text-sm font-medium px-3 py-1.5 rounded-full">
+              Filtered: Low Stock
+              <button
+                onClick={() => { setStatus('All'); window.location.hash = '#/' }}
+                className="ml-1 hover:bg-white/20 rounded-full p-0.5 transition-colors"
+                aria-label="Clear low stock filter"
+              >
+                <X size={13} />
+              </button>
+            </span>
+          </div>
+        )}
 
         {/* Search / filters */}
         <div className="mt-8 md:mt-10 flex flex-col items-center text-center">
@@ -402,8 +420,6 @@ function AppShell() {
     const detailMatch = hash.match(/^invoices\/(.+)$/)
     if (detailMatch) return { page: 'invoices/detail', invoiceId: detailMatch[1] }
     if (hash === 'invoices') return { page: 'invoices' }
-    if (hash === 'preorders') return { page: 'preorders' }
-    if (hash === 'layaways') return { page: 'layaways' }
     return { page: 'inventory' }
   }, [])
 
@@ -431,8 +447,6 @@ function AppShell() {
   if (pg === 'invoices/edit') return <div className="min-h-screen bg-white"><Header page="invoices" onNavigate={handleNavigate} /><InvoiceDetail invoiceId={route.invoiceId} autoEdit /></div>
   if (pg === 'invoices/detail') return <div className="min-h-screen bg-white"><Header page="invoices" onNavigate={handleNavigate} /><InvoiceDetail invoiceId={route.invoiceId} /></div>
   if (pg === 'invoices') return <div className="min-h-screen bg-white"><Header page="invoices" onNavigate={handleNavigate} /><Invoices onNavigate={handleNavigate} /></div>
-  if (pg === 'preorders') return <div className="min-h-screen bg-white"><Header page="preorders" onNavigate={handleNavigate} /><Invoices onNavigate={handleNavigate} preorderOnly /></div>
-  if (pg === 'layaways') return <div className="min-h-screen bg-white"><Header page="layaways" onNavigate={handleNavigate} /><Invoices onNavigate={handleNavigate} layawayOnly /></div>
 
   return <Inventory page={pg} onNavigate={handleNavigate} />
 }
