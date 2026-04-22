@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Plus, Search, Eye, FileText, Loader2, Package, Pencil, Tag, Clock, AlertCircle, Check } from 'lucide-react'
+import { toast } from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 
 function formatDate(dateStr) {
@@ -77,6 +78,17 @@ function LayawayDueIcon({ invoice }) {
   return null
 }
 
+function getYearForInvoice(invoice) {
+  if (invoice.created_at) return new Date(invoice.created_at).getFullYear()
+  const match = String(invoice.invoice_number || '').match(/^[A-Za-z]+-(\d{4})-\d{4}$/)
+  if (match) return Number(match[1])
+  return new Date().getFullYear()
+}
+
+function buildCanonicalInvoiceNumber(year, seq) {
+  return `FFC-${year}-${String(seq).padStart(4, '0')}`
+}
+
 export default function Invoices({ onNavigate }) {
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(true)
@@ -104,6 +116,44 @@ export default function Invoices({ onNavigate }) {
         .select('*')
         .order('created_at', { ascending: false })
       if (!error && data) {
+        const chronological = [...data].sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0))
+        const yearCounters = new Map()
+        const pendingUpdates = []
+
+        for (const inv of chronological) {
+          const year = getYearForInvoice(inv)
+          const nextSeq = (yearCounters.get(year) || 0) + 1
+          yearCounters.set(year, nextSeq)
+          const canonical = buildCanonicalInvoiceNumber(year, nextSeq)
+          if (inv.invoice_number !== canonical) {
+            pendingUpdates.push({ id: inv.id, invoice_number: canonical })
+          }
+        }
+
+        if (pendingUpdates.length > 0) {
+          const updateResults = await Promise.all(
+            pendingUpdates.map((update) =>
+              supabase
+                .from('invoices')
+                .update({ invoice_number: update.invoice_number })
+                .eq('id', update.id)
+            )
+          )
+          const firstError = updateResults.find((r) => r.error)?.error
+          if (firstError) {
+            toast.error(`Failed to repair old invoice numbers: ${firstError.message}`)
+          } else {
+            toast.success(`Repaired ${pendingUpdates.length} invoice number${pendingUpdates.length === 1 ? '' : 's'}`)
+            const patched = data.map((inv) => {
+              const found = pendingUpdates.find((u) => u.id === inv.id)
+              return found ? { ...inv, invoice_number: found.invoice_number } : inv
+            })
+            setInvoices(patched)
+            setLoading(false)
+            return
+          }
+        }
+
         setInvoices(data)
       }
       setLoading(false)
@@ -322,6 +372,8 @@ export default function Invoices({ onNavigate }) {
                   <tr className="bg-[#F5F3FF] border-b border-[#EDE9FE]">
                     <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Invoice #</th>
                     <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Customer</th>
+                    <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Created By</th>
+                    <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Updated By</th>
                     <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Date</th>
                     <th className="text-right px-4 py-3 font-semibold text-[#7C3AED]">Total</th>
                     <th className="text-left px-4 py-3 font-semibold text-[#7C3AED]">Payment</th>
@@ -354,7 +406,11 @@ export default function Invoices({ onNavigate }) {
                           <LayawayDueIcon invoice={inv} />
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-gray-700">{inv.customer_name || '—'}</td>
+                      <td className="px-4 py-3 text-gray-700">
+                        <p>{inv.customer_name || '—'}</p>
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">{inv.created_by || '—'}</td>
+                      <td className="px-4 py-3 text-gray-600">{inv.updated_by || '—'}</td>
                       <td className="px-4 py-3 text-gray-500">{formatDate(inv.created_at)}</td>
                       <td className="px-4 py-3 text-right font-semibold text-gray-800">
                         {formatCurrency(inv.total)}
@@ -424,6 +480,8 @@ export default function Invoices({ onNavigate }) {
                       )}
                     </div>
                     <p className="text-sm text-gray-700">{inv.customer_name || '—'}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Created By: {inv.created_by || '—'}</p>
+                    <p className="text-xs text-gray-400">Updated By: {inv.updated_by || '—'}</p>
                     <p className="text-xs text-gray-400">{formatDate(inv.created_at)}</p>
                   </div>
                   <p className="text-lg font-bold text-gray-800">{formatCurrency(inv.total)}</p>
