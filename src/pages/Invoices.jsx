@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Plus, Search, Eye, FileText, Loader2, Package, Pencil, Tag, Clock, AlertCircle, Check } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
+import { formatAuditUser } from '../lib/userDisplay'
 
 function formatDate(dateStr) {
   if (!dateStr) return '—'
@@ -86,7 +87,7 @@ function getYearForInvoice(invoice) {
 }
 
 function buildCanonicalInvoiceNumber(year, seq) {
-  return `FFC-${year}-${String(seq).padStart(4, '0')}`
+  return `FFZ-${year}-${String(seq).padStart(4, '0')}`
 }
 
 function getInvoiceOrderType(invoice) {
@@ -382,6 +383,7 @@ export default function Invoices({ onNavigate }) {
                 <tbody>
                   {filtered.map((inv) => {
                     const invoiceOrderType = getInvoiceOrderType(inv)
+                    const updatedByDisplay = formatAuditUser(inv.updated_by, '—')
                     return (
                       <tr key={inv.id} className="border-b border-[#EDE9FE]/60 hover:bg-[#EDE9FE]/30 transition-colors">
                         <td className="px-4 py-3 font-medium text-[#6D28D9]">
@@ -417,7 +419,7 @@ export default function Invoices({ onNavigate }) {
                             {invoiceOrderType === 'preorder' ? <FulfillmentBadge status={inv.fulfillment_status} /> : '—'}
                           </td>
                         )}
-                        <td className="px-4 py-3 text-gray-600">{inv.updated_by || '—'}</td>
+                        <td className="px-4 py-3 text-gray-600" title={updatedByDisplay.tooltip || undefined}>{updatedByDisplay.primary}</td>
                         <td className="px-4 py-3 text-center">
                           <div className="inline-flex items-center gap-2">
                             <a
@@ -447,6 +449,7 @@ export default function Invoices({ onNavigate }) {
           <div className="md:hidden space-y-3">
             {filtered.map((inv) => {
               const invoiceOrderType = getInvoiceOrderType(inv)
+              const updatedByDisplay = formatAuditUser(inv.updated_by, '—')
               return (
                 <div key={inv.id} className="bg-white rounded-xl shadow-sm border border-[#EDE9FE] p-4">
                   <div className="flex items-start justify-between mb-3">
@@ -465,7 +468,7 @@ export default function Invoices({ onNavigate }) {
                         )}
                       </div>
                       <p className="text-sm text-gray-700">{inv.customer_name || '—'}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">Updated By: {inv.updated_by || '—'}</p>
+                      <p className="text-xs text-gray-400 mt-0.5" title={updatedByDisplay.tooltip || undefined}>Updated By: {updatedByDisplay.primary}</p>
                       <p className="text-xs text-gray-400">{formatDate(inv.created_at)}</p>
                     </div>
                     <p className="text-lg font-bold text-gray-800">{formatCurrency(inv.total)}</p>
