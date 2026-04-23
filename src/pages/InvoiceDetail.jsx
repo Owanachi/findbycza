@@ -3,6 +3,7 @@ import { ArrowLeft, Printer, XCircle, AlertTriangle, Loader2, Search, Package, T
 import { toast } from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
+import { formatAuditUser } from '../lib/userDisplay'
 
 const LOGO_URL = 'https://iixivpuyrxeoapsouszx.supabase.co/storage/v1/object/public/product-images/Logo.jpg'
 
@@ -900,11 +901,14 @@ export default function InvoiceDetail({ invoiceId, autoEdit }) {
   const totalPayments = payments.reduce((sum, p) => sum + Number(p.amount), 0)
   const isLayaway = invoice.is_layaway || false
   const layawayStatus = invoice.layaway_status || 'Active'
-  const createdBy = invoice.created_by || 'Unknown'
-  const updatedBy = invoice.updated_by || invoice.created_by || 'Unknown'
-  const auditLines = createdBy === updatedBy
-    ? [`Created & last updated by: ${createdBy}`]
-    : [`Created by: ${createdBy}`, `Last updated by: ${updatedBy}`]
+  const createdBy = formatAuditUser(invoice.created_by, 'Unknown')
+  const updatedBy = formatAuditUser(invoice.updated_by || invoice.created_by, 'Unknown')
+  const auditLines = createdBy.raw && updatedBy.raw && createdBy.raw === updatedBy.raw
+    ? [{ label: 'Created & last updated by', user: createdBy }]
+    : [
+      { label: 'Created by', user: createdBy },
+      { label: 'Last updated by', user: updatedBy },
+    ]
 
   async function handleLayawayComplete() {
     setCompleting(true)
@@ -1157,8 +1161,11 @@ export default function InvoiceDetail({ invoiceId, autoEdit }) {
                 <p className="text-sm font-semibold text-gray-700 mt-1">{invoice.invoice_number}</p>
                 <p className="text-sm text-gray-500">{formatDate(invoice.created_at)}</p>
                 <div className="mt-1 space-y-0.5 text-xs text-gray-400 print:text-gray-500">
-                  {auditLines.map((line) => (
-                    <p key={line}>{line}</p>
+                  {auditLines.map(({ label, user }) => (
+                    <p key={label}>
+                      {label}: {user.primary}
+                      {user.secondary && <span className="text-[11px] text-gray-300 print:text-gray-400"> ({user.secondary})</span>}
+                    </p>
                   ))}
                 </div>
               </div>
