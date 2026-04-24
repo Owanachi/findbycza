@@ -39,7 +39,7 @@ async function generateNextInvoiceNumber() {
     }
   }
 
-  return `FFC-${year}-${String(maxSeq + 1).padStart(4, '0')}`
+  return `FFZ-${year}-${String(maxSeq + 1).padStart(4, '0')}`
 }
 
 function ProductThumb({ img, name }) {
