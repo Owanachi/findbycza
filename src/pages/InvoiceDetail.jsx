@@ -470,7 +470,50 @@ function EditInvoiceModal({ invoice, onClose, onSaved, userEmail }) {
       ...fulfillmentUpdates,
     }
 
-    const { error: invErr } = await supabase.from('invoices').update(invoiceUpdate).eq('id', invoice.id)
+    async function updateInvoiceWithFallback(payload) {
+      const optionalColumns = [
+        'shipping_fee',
+        'expected_arrival_date',
+        'fulfillment_status',
+        'is_layaway',
+        'layaway_deposit_amount',
+        'layaway_due_date',
+        'layaway_status',
+      ]
+
+      const tryUpdate = async (nextPayload) => (
+        supabase.from('invoices').update(nextPayload).eq('id', invoice.id)
+      )
+
+      let result = await tryUpdate(payload)
+      if (!result.error) return result
+
+      const missingColumnError =
+        result.error?.code === 'PGRST204' ||
+        result.error?.code === '42703' ||
+        /column/i.test(result.error?.message || '') ||
+        /schema cache/i.test(result.error?.message || '')
+
+      if (!missingColumnError) return result
+
+      let reducedPayload = { ...payload }
+
+      for (const column of optionalColumns) {
+        if (!(column in reducedPayload)) continue
+        const nextPayload = { ...reducedPayload }
+        delete nextPayload[column]
+        const retry = await tryUpdate(nextPayload)
+        if (!retry.error) {
+          console.warn(`Invoice update used schema-compat fallback (removed column: ${column})`)
+          return retry
+        }
+        reducedPayload = nextPayload
+      }
+
+      return result
+    }
+
+    const { error: invErr } = await updateInvoiceWithFallback(invoiceUpdate)
     if (invErr) {
       toast.error('Failed to update invoice')
       console.error(invErr)
