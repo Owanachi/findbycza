@@ -278,6 +278,7 @@ export default function NewInvoice() {
         customer_contact: customerContact.trim() || null,
         subtotal,
         discount: discountAmount,
+        shipping_fee: shippingFee,
         total,
         payment_method: paymentMethod || null,
         shipping_option: shippingOption || null,

@@ -452,6 +452,7 @@ function EditInvoiceModal({ invoice, onClose, onSaved, userEmail }) {
       customer_contact: customerContact.trim() || null,
       subtotal,
       discount: discountAmount,
+      shipping_fee: shippingFee,
       total,
       payment_method: paymentMethod || null,
       shipping_option: shippingOption || null,
@@ -1233,6 +1234,9 @@ export default function InvoiceDetail({ invoiceId, autoEdit }) {
                   <p className="text-sm text-gray-500">
                     <span className="text-xs font-medium text-gray-400 uppercase mr-1">Shipping</span>
                     {invoice.shipping_option}
+                    {Number(invoice.shipping_fee || 0) > 0 && (
+                      <span className="text-gray-400"> ({formatCurrency(invoice.shipping_fee)})</span>
+                    )}
                   </p>
                 )}
                 {isVoided && invoice.voided_at && (
@@ -1281,6 +1285,12 @@ export default function InvoiceDetail({ invoiceId, autoEdit }) {
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-500">Discount</span>
                     <span className="font-medium text-red-500">-{formatCurrency(invoice.discount)}</span>
+                  </div>
+                )}
+                {Number(invoice.shipping_fee || 0) > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Shipping Fee</span>
+                    <span className="font-medium text-gray-800">{formatCurrency(invoice.shipping_fee)}</span>
                   </div>
                 )}
                 <div className="border-t border-[#EDE9FE] print:border-gray-200 pt-2 flex justify-between">
