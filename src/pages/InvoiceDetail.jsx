@@ -318,6 +318,15 @@ function EditInvoiceModal({ invoice, onClose, onSaved, userEmail }) {
   const [customerContact, setCustomerContact] = useState(invoice.customer_contact || '')
   const [paymentMethod, setPaymentMethod] = useState(invoice.payment_method || '')
   const [shippingOption, setShippingOption] = useState(invoice.shipping_option || '')
+  const [shippingFeeValue, setShippingFeeValue] = useState(() => {
+    const explicitFee = Number(invoice.shipping_fee)
+    if (Number.isFinite(explicitFee) && explicitFee > 0) return String(explicitFee)
+
+    const itemsSubtotal = (invoice.invoice_items || []).reduce((sum, it) => sum + (Number(it.unit_price) || 0) * (Number(it.qty) || 0), 0)
+    const discount = Math.max(0, Number(invoice.discount) || 0)
+    const inferredFee = Math.max(0, (Number(invoice.total) || 0) - Math.max(0, itemsSubtotal - discount))
+    return inferredFee > 0 ? String(Math.round(inferredFee * 100) / 100) : ''
+  })
   const [paymentStatus, setPaymentStatus] = useState(invoice.payment_status || 'Unpaid')
   const [amountPaid, setAmountPaid] = useState(String(invoice.amount_paid || ''))
   const [discountValue, setDiscountValue] = useState(String(invoice.discount || ''))
@@ -385,7 +394,8 @@ function EditInvoiceModal({ invoice, onClose, onSaved, userEmail }) {
 
   const subtotal = lineItems.reduce((sum, li) => sum + li.unit_price * li.qty, 0)
   const discountAmount = Math.min(subtotal, Math.max(0, Number(discountValue) || 0))
-  const total = Math.max(0, subtotal - discountAmount)
+  const shippingFee = Math.max(0, Number(shippingFeeValue) || 0)
+  const total = Math.max(0, subtotal - discountAmount + shippingFee)
   const paidNum = Number(amountPaid) || 0
 
   // Auto-fill amount_paid when switching to Paid
@@ -553,6 +563,18 @@ function EditInvoiceModal({ invoice, onClose, onSaved, userEmail }) {
               </select>
             </div>
             <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Shipping Fee (₱)</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Optional"
+                value={shippingFeeValue}
+                onChange={(e) => setShippingFeeValue(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+            <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Payment Status</label>
               <select value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)} className={inputClass}>
                 <option value="Unpaid">Unpaid</option>
@@ -677,6 +699,12 @@ function EditInvoiceModal({ invoice, onClose, onSaved, userEmail }) {
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Discount</span>
                   <span className="font-medium text-red-500">-{formatCurrency(discountAmount)}</span>
+                </div>
+              )}
+              {shippingFee > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Shipping Fee</span>
+                  <span className="font-medium">{formatCurrency(shippingFee)}</span>
                 </div>
               )}
               <div className="border-t pt-2 flex justify-between">
