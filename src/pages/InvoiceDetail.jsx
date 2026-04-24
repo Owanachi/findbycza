@@ -497,7 +497,6 @@ function EditInvoiceModal({ invoice, onClose, onSaved, userEmail }) {
       if (!missingColumnError) return result
 
       let reducedPayload = { ...payload }
-      let removedAny = false
 
       for (const column of optionalColumns) {
         if (!(column in reducedPayload)) continue
@@ -505,13 +504,10 @@ function EditInvoiceModal({ invoice, onClose, onSaved, userEmail }) {
         delete nextPayload[column]
         const retry = await tryUpdate(nextPayload)
         if (!retry.error) {
-          if (!removedAny) {
-            toast('Saved with fallback schema compatibility', { icon: '⚠️' })
-          }
+          console.warn(`Invoice update used schema-compat fallback (removed column: ${column})`)
           return retry
         }
         reducedPayload = nextPayload
-        removedAny = true
       }
 
       return result
