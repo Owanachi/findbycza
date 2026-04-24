@@ -39,7 +39,7 @@ async function generateNextInvoiceNumber() {
     }
   }
 
-  return `FFC-${year}-${String(maxSeq + 1).padStart(4, '0')}`
+  return `FFZ-${year}-${String(maxSeq + 1).padStart(4, '0')}`
 }
 
 function ProductThumb({ img, name }) {
@@ -146,6 +146,7 @@ export default function NewInvoice() {
   const [customerContact, setCustomerContact] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('')
   const [shippingOption, setShippingOption] = useState('')
+  const [shippingFeeValue, setShippingFeeValue] = useState('')
   const [paymentStatus, setPaymentStatus] = useState('Unpaid')
   const [amountPaid, setAmountPaid] = useState('')
   const [isPreorder, setIsPreorder] = useState(false)
@@ -224,7 +225,8 @@ export default function NewInvoice() {
     return Math.min(subtotal, v)
   }, [discountValue, discountType, subtotal])
 
-  const total = Math.max(0, subtotal - discountAmount)
+  const shippingFee = Math.max(0, Number(shippingFeeValue) || 0)
+  const total = Math.max(0, subtotal - discountAmount + shippingFee)
   const paidNum = Number(amountPaid) || 0
   const balanceDue = Math.max(0, total - paidNum)
 
@@ -533,6 +535,18 @@ export default function NewInvoice() {
                 </select>
               </div>
               <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Shipping Fee (₱)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="Optional"
+                  value={shippingFeeValue}
+                  onChange={(e) => setShippingFeeValue(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+              <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Payment Status</label>
                 <select value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)} className={inputClass}>
                   <option value="Unpaid">Unpaid</option>
@@ -694,6 +708,12 @@ export default function NewInvoice() {
                     Discount{discountType === 'percent' && discountValue ? ` (${discountValue}%)` : ''}
                   </span>
                   <span className="font-medium text-red-500">-{formatCurrency(discountAmount)}</span>
+                </div>
+              )}
+              {shippingFee > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Shipping Fee</span>
+                  <span className="font-medium text-gray-800">{formatCurrency(shippingFee)}</span>
                 </div>
               )}
               <div className="border-t border-[#DDD6FE] pt-3 flex justify-between">
