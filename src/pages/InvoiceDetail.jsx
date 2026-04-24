@@ -975,6 +975,7 @@ export default function InvoiceDetail({ invoiceId, autoEdit }) {
   const layawayStatus = invoice.layaway_status || 'Active'
   const createdBy = formatAuditUser(invoice.created_by, 'Unknown')
   const updatedBy = formatAuditUser(invoice.updated_by || invoice.created_by, 'Unknown')
+  const displayTimestamp = invoice.updated_at || invoice.created_at
   const auditLines = createdBy.raw && updatedBy.raw && createdBy.raw === updatedBy.raw
     ? [{ label: 'Created & last updated by', user: createdBy }]
     : [
@@ -1231,7 +1232,7 @@ export default function InvoiceDetail({ invoiceId, autoEdit }) {
               <div className="text-left sm:text-right">
                 <p className="text-2xl font-extrabold text-[#7C3AED] tracking-tight print:text-gray-900">INVOICE</p>
                 <p className="text-sm font-semibold text-gray-700 mt-1">{invoice.invoice_number}</p>
-                <p className="text-sm text-gray-500">{formatDate(invoice.created_at)}</p>
+                <p className="text-sm text-gray-500">{formatDate(displayTimestamp)}</p>
                 <div className="mt-1 space-y-0.5 text-xs text-gray-400 print:text-gray-500">
                   {auditLines.map(({ label, user }) => (
                     <p key={label}>
