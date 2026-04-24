@@ -18,6 +18,10 @@ function formatCurrency(amount) {
   return `₱${Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
+function getInvoiceDisplayTimestamp(invoice) {
+  return invoice?.updated_at || invoice?.created_at
+}
+
 const paymentStatusStyles = {
   Unpaid: 'bg-red-100 text-red-700',
   'Partially Paid': 'bg-yellow-100 text-yellow-700',
@@ -405,7 +409,7 @@ export default function Invoices({ onNavigate }) {
                         <td className="px-4 py-3 text-gray-700">
                           <p>{inv.customer_name || '—'}</p>
                         </td>
-                        <td className="px-4 py-3 text-gray-500">{formatDate(inv.created_at)}</td>
+                        <td className="px-4 py-3 text-gray-500">{formatDate(getInvoiceDisplayTimestamp(inv))}</td>
                         <td className="px-4 py-3 text-right font-semibold text-gray-800">{formatCurrency(inv.total)}</td>
                         <td className="px-4 py-3 text-gray-600">{inv.payment_method || '—'}</td>
                         <td className="px-4 py-3 text-center">
@@ -469,7 +473,7 @@ export default function Invoices({ onNavigate }) {
                       </div>
                       <p className="text-sm text-gray-700">{inv.customer_name || '—'}</p>
                       <p className="text-xs text-gray-400 mt-0.5" title={updatedByDisplay.tooltip || undefined}>Updated By: {updatedByDisplay.primary}</p>
-                      <p className="text-xs text-gray-400">{formatDate(inv.created_at)}</p>
+                      <p className="text-xs text-gray-400">{formatDate(getInvoiceDisplayTimestamp(inv))}</p>
                     </div>
                     <p className="text-lg font-bold text-gray-800">{formatCurrency(inv.total)}</p>
                   </div>
