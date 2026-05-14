@@ -1301,7 +1301,7 @@ export default function InvoiceDetail({ invoiceId, autoEdit }) {
                   <p>- Minimum deposit: 30% due at reservation</p>
                   <p>- Full payment due by: {invoice.layaway_due_date ? formatDateShort(invoice.layaway_due_date) : 'N/A'}</p>
                   <p>- Items held in store, not released until fully paid</p>
-                  <p>- Cancellation: 80% refund of amount paid, 20% admin fee</p>
+                  <p>- NO CANCELLATION. Upon cancellation, NO REFUND.</p>
                   <p>- Default: 50% deposit forfeit after 2 missed payments</p>
                 </div>
               </div>
